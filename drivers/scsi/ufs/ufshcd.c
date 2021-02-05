@@ -363,7 +363,7 @@ ufs_get_pm_lvl_to_link_pwr_state(enum ufs_pm_level lvl)
 {
 	return ufs_pm_lvl_states[lvl].link_state;
 }
-
+F_UAC
 static inline void ufshcd_set_card_online(struct ufs_hba *hba)
 {
 	atomic_set(&hba->card_state, UFS_CARD_STATE_ONLINE);
@@ -3218,6 +3218,7 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 
 	err = ufshcd_map_sg(hba, lrbp);
 	if (err) {
+		ufshcd_release(hba);
 		lrbp->cmd = NULL;
 		clear_bit_unlock(tag, &hba->lrb_in_use);
 		ufshcd_release_all(hba);
