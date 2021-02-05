@@ -34,6 +34,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/blk-cgroup.h>
 #include <linux/psi.h>
+#include <linux/mi_io.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/block.h>
@@ -309,7 +310,9 @@ inline void __blk_run_queue_uncond(struct request_queue *q)
 	 * can wait until all these request_fn calls have finished.
 	 */
 	q->request_fn_active++;
+	preempt_disable();
 	q->request_fn(q);
+	preempt_enable();
 	q->request_fn_active--;
 }
 EXPORT_SYMBOL_GPL(__blk_run_queue_uncond);
@@ -324,10 +327,27 @@ EXPORT_SYMBOL_GPL(__blk_run_queue_uncond);
  */
 void __blk_run_queue(struct request_queue *q)
 {
+	u64 s_running_time, s_runnable_time;
+	unsigned long s_total_time;
+	unsigned int delta;
+
 	if (unlikely(blk_queue_stopped(q)))
 		return;
 
+	s_total_time = jiffies;
+	s_running_time = current->se.sum_exec_runtime;
+	s_runnable_time = current->sched_info.run_delay;
 	__blk_run_queue_uncond(q);
+	if (IO_SHOW_LOG) {
+		delta = jiffies_to_msecs(jiffies - s_total_time);
+		if (delta > IO_BLK_DRIVER_LEVEL) {
+			pr_info("Slow IO Driver:  %d(%s) prio(%d|%d), total_time(%dms) running_time(%lluns) runnable(%lluns)\n",
+				current->pid, current->comm,
+				current->policy, current->prio, delta,
+				current->se.sum_exec_runtime - s_running_time,
+				current->sched_info.run_delay - s_runnable_time);
+		}
+	}
 }
 EXPORT_SYMBOL(__blk_run_queue);
 
@@ -2085,9 +2105,10 @@ EXPORT_SYMBOL(generic_make_request);
  */
 blk_qc_t submit_bio(struct bio *bio)
 {
-	bool workingset_read = false;
-	unsigned long pflags;
 	blk_qc_t ret;
+	u64 s_running_time, s_runnable_time;
+	unsigned long s_total_time;
+	unsigned int delta;
 
 	/*
 	 * If it's a regular read/write or a barrier with data attached,
@@ -2134,6 +2155,21 @@ blk_qc_t submit_bio(struct bio *bio)
 
 	if (workingset_read)
 		psi_memstall_leave(&pflags);
+
+	s_total_time = jiffies;
+	s_running_time = current->se.sum_exec_runtime;
+	s_runnable_time = current->sched_info.run_delay;
+	ret = generic_make_request(bio);
+	if (IO_SHOW_LOG) {
+		delta = jiffies_to_msecs(jiffies - s_total_time);
+		if (delta > IO_BLK_SUBMIT_BIO_LEVEL) {
+			pr_info("Slow IO BLK|Submit_bio:  %d(%s) prio(%d|%d), total_time(%dms) running_time(%lluns) runnable(%lluns)\n",
+				current->pid, current->comm,
+				current->policy, current->prio, delta,
+				current->se.sum_exec_runtime - s_running_time,
+				current->sched_info.run_delay - s_runnable_time);
+		}
+	}
 
 	return ret;
 }
@@ -2494,6 +2530,10 @@ void blk_dequeue_request(struct request *rq)
 		q->in_flight[rq_is_sync(rq)]++;
 		set_io_start_time_ns(rq);
 	}
+
+	#ifdef CONFIG_BLK_CGROUP
+	set_io_start_time_ns(rq);
+	#endif
 }
 
 /**
@@ -3359,7 +3399,7 @@ void blk_finish_plug(struct blk_plug *plug)
 }
 EXPORT_SYMBOL(blk_finish_plug);
 
-bool blk_poll(struct request_queue *q, blk_qc_t cookie)
+bool blk_poll(struct request_queue *q, blk_qc_t cookie, struct bio *bio)
 {
 	struct blk_plug *plug;
 	long state;
@@ -3367,7 +3407,7 @@ bool blk_poll(struct request_queue *q, blk_qc_t cookie)
 	struct blk_mq_hw_ctx *hctx;
 
 	if (!q->mq_ops || !q->mq_ops->poll || !blk_qc_t_valid(cookie) ||
-	    !test_bit(QUEUE_FLAG_POLL, &q->queue_flags))
+	    !bio || !test_bit(QUEUE_FLAG_POLL, &q->queue_flags))
 		return false;
 
 	queue_num = blk_qc_t_to_queue_num(cookie);
@@ -3383,8 +3423,7 @@ bool blk_poll(struct request_queue *q, blk_qc_t cookie)
 		int ret;
 
 		hctx->poll_invoked++;
-
-		ret = q->mq_ops->poll(hctx, blk_qc_t_to_tag(cookie));
+		ret = q->mq_ops->poll(hctx, blk_qc_t_to_tag(cookie), bio);
 		if (ret > 0) {
 			hctx->poll_success++;
 			set_current_state(TASK_RUNNING);
@@ -3404,6 +3443,32 @@ bool blk_poll(struct request_queue *q, blk_qc_t cookie)
 	return false;
 }
 EXPORT_SYMBOL_GPL(blk_poll);
+
+void blk_set_bio_status(struct request *rq, unsigned int status)
+{
+	struct bio *bio;
+	for (bio = rq->bio; bio; bio = bio->bi_next) {
+		bio->bi_status = status;
+	}
+}
+EXPORT_SYMBOL_GPL(blk_set_bio_status);
+
+bool blk_request_is_polling(struct request *rq)
+{
+	bool polling = false;
+	struct bio *bio;
+	for (bio = rq->bio; bio; bio = bio->bi_next) {
+		if (bio->bi_polling == true)
+			polling = true;
+	}
+	return polling;
+}
+
+void blk_request_set_polling(struct request *rq, bool polling) {
+	struct bio *bio;
+	for (bio = rq->bio; bio; bio = bio->bi_next)
+		bio->bi_polling = polling;
+}
 
 #ifdef CONFIG_PM
 /**
