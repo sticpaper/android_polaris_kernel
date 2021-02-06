@@ -5,6 +5,7 @@
  *
  * Copyright (C) 2012 Alexandra Chin <alexandra.chin@tw.synaptics.com>
  * Copyright (C) 2012 Scott Lin <scott.lin@tw.synaptics.com>
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -716,7 +717,7 @@ static int rmidev_release(struct inode *inp, struct file *filp)
 	if (dev_data->ref_count < 0)
 		dev_data->ref_count = 0;
 
-//	rmi4_data->reset_device(rmi4_data, false);
+
 	rmi4_data->irq_enable(rmi4_data, true, false);
 
 	rmi4_data->stay_awake = false;
@@ -908,10 +909,6 @@ static int rmidev_init_device(struct synaptics_rmi4_data *rmi4_data)
 			dev_err(rmi4_data->pdev->dev.parent,
 					"%s Failed to create gpio symlink\n",
 					__func__);
-		} else {
-			dev_dbg(rmi4_data->pdev->dev.parent,
-					"%s: Exported attention gpio %d\n",
-					__func__, bdata->irq_gpio);
 		}
 	}
 

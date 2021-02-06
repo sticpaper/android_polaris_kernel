@@ -204,12 +204,6 @@ struct fts_ts_data {
 	struct proc_dir_entry *tp_data_dump_proc;
 	struct proc_dir_entry *tp_fw_version_proc;
 	struct proc_dir_entry *tp_lockdown_info_proc;
-#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
-	bool palm_sensor_switch;
-	bool palm_sensor_changed;
-	struct class *tp_class;
-	bool gamemode_enabled;
-#endif
 
 };
 
@@ -264,12 +258,6 @@ int fts_esdcheck_proc_busy(bool proc_debug);
 int fts_esdcheck_set_intr(bool intr);
 int fts_esdcheck_suspend(void);
 int fts_esdcheck_resume(void);
-#endif
-
-/* Production test */
-#if FTS_TEST_EN
-int fts_test_init(struct i2c_client *client);
-int fts_test_exit(struct i2c_client *client);
 #endif
 
 /* Point Report Check*/

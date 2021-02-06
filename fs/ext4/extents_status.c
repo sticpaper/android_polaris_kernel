@@ -251,7 +251,6 @@ void ext4_es_find_delayed_extent_range(struct inode *inode,
 
 	BUG_ON(es == NULL);
 	BUG_ON(end < lblk);
-	trace_ext4_es_find_delayed_extent_range_enter(inode, lblk);
 
 	read_lock(&EXT4_I(inode)->i_es_lock);
 	tree = &EXT4_I(inode)->i_es_tree;
@@ -291,8 +290,6 @@ out:
 	}
 
 	read_unlock(&EXT4_I(inode)->i_es_lock);
-
-	trace_ext4_es_find_delayed_extent_range_exit(inode, es);
 }
 
 static void ext4_es_list_add(struct inode *inode)
@@ -714,7 +711,6 @@ int ext4_es_insert_extent(struct inode *inode, ext4_lblk_t lblk,
 	newes.es_lblk = lblk;
 	newes.es_len = len;
 	ext4_es_store_pblock_status(&newes, pblk, status);
-	trace_ext4_es_insert_extent(inode, &newes);
 
 	ext4_es_insert_extent_check(inode, &newes);
 
@@ -754,7 +750,6 @@ void ext4_es_cache_extent(struct inode *inode, ext4_lblk_t lblk,
 	newes.es_lblk = lblk;
 	newes.es_len = len;
 	ext4_es_store_pblock_status(&newes, pblk, status);
-	trace_ext4_es_cache_extent(inode, &newes);
 
 	if (!len)
 		return;
@@ -784,9 +779,6 @@ int ext4_es_lookup_extent(struct inode *inode, ext4_lblk_t lblk,
 	struct extent_status *es1 = NULL;
 	struct rb_node *node;
 	int found = 0;
-
-	trace_ext4_es_lookup_extent_enter(inode, lblk);
-	es_debug("lookup extent in block %u\n", lblk);
 
 	tree = &EXT4_I(inode)->i_es_tree;
 	read_lock(&EXT4_I(inode)->i_es_lock);
@@ -832,7 +824,6 @@ out:
 
 	read_unlock(&EXT4_I(inode)->i_es_lock);
 
-	trace_ext4_es_lookup_extent_exit(inode, es, found);
 	return found;
 }
 
@@ -947,10 +938,6 @@ int ext4_es_remove_extent(struct inode *inode, ext4_lblk_t lblk,
 	ext4_lblk_t end;
 	int err = 0;
 
-	trace_ext4_es_remove_extent(inode, lblk, len);
-	es_debug("remove [%u/%u) from extent status tree of inode %lu\n",
-		 lblk, len, inode->i_ino);
-
 	if (!len)
 		return err;
 
@@ -1052,8 +1039,6 @@ out:
 	else
 		es_stats->es_stats_shrunk = nr_shrunk;
 
-	trace_ext4_es_shrink(sbi->s_sb, nr_shrunk, scan_time,
-			     nr_skipped, retried);
 	return nr_shrunk;
 }
 
@@ -1065,7 +1050,6 @@ static unsigned long ext4_es_count(struct shrinker *shrink,
 
 	sbi = container_of(shrink, struct ext4_sb_info, s_es_shrinker);
 	nr = percpu_counter_read_positive(&sbi->s_es_stats.es_stats_shk_cnt);
-	trace_ext4_es_shrink_count(sbi->s_sb, sc->nr_to_scan, nr);
 	return nr;
 }
 
@@ -1078,14 +1062,12 @@ static unsigned long ext4_es_scan(struct shrinker *shrink,
 	int ret, nr_shrunk;
 
 	ret = percpu_counter_read_positive(&sbi->s_es_stats.es_stats_shk_cnt);
-	trace_ext4_es_shrink_scan_enter(sbi->s_sb, nr_to_scan, ret);
 
 	if (!nr_to_scan)
 		return ret;
 
 	nr_shrunk = __es_shrink(sbi, nr_to_scan, NULL);
 
-	trace_ext4_es_shrink_scan_exit(sbi->s_sb, nr_shrunk, ret);
 	return nr_shrunk;
 }
 

@@ -1075,7 +1075,6 @@ void __module_get(struct module *module)
 	if (module) {
 		preempt_disable();
 		atomic_inc(&module->refcnt);
-		trace_module_get(module, _RET_IP_);
 		preempt_enable();
 	}
 }
@@ -1090,7 +1089,6 @@ bool try_module_get(struct module *module)
 		/* Note: here, we can fail to get a reference */
 		if (likely(module_is_live(module) &&
 			   atomic_inc_not_zero(&module->refcnt) != 0))
-			trace_module_get(module, _RET_IP_);
 		else
 			ret = false;
 
@@ -1108,7 +1106,6 @@ void module_put(struct module *module)
 		preempt_disable();
 		ret = atomic_dec_if_positive(&module->refcnt);
 		WARN_ON(ret < 0);	/* Failed to put refcount */
-		trace_module_put(module, _RET_IP_);
 		preempt_enable();
 	}
 }
@@ -2106,7 +2103,6 @@ static void cfi_cleanup(struct module *mod);
 /* Free a module, remove from lists, etc. */
 static void free_module(struct module *mod)
 {
-	trace_module_free(mod);
 
 	mod_sysfs_teardown(mod);
 
@@ -3749,9 +3745,6 @@ static int load_module(struct load_info *info, const char __user *uargs,
 
 	/* Get rid of temporary copy. */
 	free_copy(info);
-
-	/* Done! */
-	trace_module_load(mod);
 
 	return do_init_module(mod);
 

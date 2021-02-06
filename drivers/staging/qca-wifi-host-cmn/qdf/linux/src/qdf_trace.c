@@ -22,6 +22,7 @@
  *  Trace, logging, and debugging definitions and APIs
  */
 
+#ifdef WLAN_DEBUG
 /* Include Files */
 #include "qdf_str.h"
 #include <qdf_trace.h>
@@ -1487,6 +1488,7 @@ uint8_t qdf_get_rate_limit_by_type(uint8_t type)
 	}
 }
 
+#ifdef WLAN_DEBUG
 /**
  * qdf_get_pkt_type_string() - Get the string based on pkt type
  * @type: packet type
@@ -1570,6 +1572,7 @@ uint8_t *qdf_get_pkt_status_string(uint8_t status)
 		return "unknown";
 	}
 }
+#endif
 
 /**
  * qdf_dp_log_proto_pkt_info() - Send diag log with pkt info
@@ -2079,7 +2082,7 @@ void qdf_dp_display_proto_pkt_always(struct qdf_dp_trace_record_s *record,
 {
 	int loc;
 	char prepend_str[QDF_DP_TRACE_PREPEND_STR_SIZE];
-	struct qdf_dp_trace_proto_buf *buf =
+	struct qdf_dp_trace_proto_buf *buf __maybe_unused =
 		(struct qdf_dp_trace_proto_buf *)record->data;
 
 	qdf_mem_zero(prepend_str, sizeof(prepend_str));
@@ -3150,6 +3153,7 @@ static inline void print_to_console(char *str_buffer)
 }
 #endif
 
+#if 0
 #ifdef MULTI_IF_NAME
 static const char *qdf_trace_wlan_modname(void)
 {
@@ -3233,6 +3237,7 @@ void qdf_trace_msg_cmn(unsigned int idx,
 	}
 }
 qdf_export_symbol(qdf_trace_msg_cmn);
+#endif
 
 QDF_STATUS qdf_print_setup(void)
 {
@@ -3656,6 +3661,7 @@ QDF_STATUS qdf_print_set_category_verbose(unsigned int idx,
 }
 qdf_export_symbol(qdf_print_set_category_verbose);
 
+#if 0
 bool qdf_print_is_category_enabled(unsigned int idx, QDF_MODULE_ID category)
 {
 	QDF_TRACE_LEVEL verbose_mask;
@@ -3727,6 +3733,7 @@ bool qdf_print_is_verbose_enabled(unsigned int idx, QDF_MODULE_ID category,
 	return verbose_enabled;
 }
 qdf_export_symbol(qdf_print_is_verbose_enabled);
+#endif
 
 #ifdef DBG_LVL_MAC_FILTERING
 
@@ -3874,4 +3881,4 @@ void __qdf_bug(void)
 qdf_export_symbol(__qdf_bug);
 #endif /* CONFIG_SLUB_DEBUG */
 #endif /* PANIC_ON_BUG */
-
+#endif /* WLAN_DEBUG */

@@ -29,6 +29,16 @@
 #define GSI_RESET_WA_MIN_SLEEP 1000
 #define GSI_RESET_WA_MAX_SLEEP 2000
 #define GSI_CHNL_STATE_MAX_RETRYCNT 10
+
+#ifndef CONFIG_GSI_DEBUGFS
+static inline void gsi_debugfs_init(void)
+{
+}
+#endif
+
+#undef WARN_ON
+#define WARN_ON(args) args
+
 static const struct of_device_id msm_gsi_match[] = {
 	{ .compatible = "qcom,msm_gsi", },
 	{ },
@@ -3178,15 +3188,17 @@ static int msm_gsi_probe(struct platform_device *pdev)
 		dev_err(dev, "failed to allocated gsi context\n");
 		return -ENOMEM;
 	}
-
+#ifdef CONFIG_IPC_LOGGING
 	gsi_ctx->ipc_logbuf = ipc_log_context_create(GSI_IPC_LOG_PAGES,
 		"gsi", 0);
 	if (gsi_ctx->ipc_logbuf == NULL)
 		GSIERR("failed to create IPC log, continue...\n");
-
+#endif
 	gsi_ctx->dev = dev;
 	init_completion(&gsi_ctx->gen_ee_cmd_compl);
+#ifdef CONFIG_DEBUG_KERNEL
 	gsi_debugfs_init();
+#endif
 
 	return 0;
 }
@@ -3208,8 +3220,6 @@ static struct platform_device *pdev;
 static int __init gsi_init(void)
 {
 	int ret;
-
-	pr_debug("gsi_init\n");
 
 	ret = platform_driver_register(&msm_gsi_driver);
 	if (ret < 0)

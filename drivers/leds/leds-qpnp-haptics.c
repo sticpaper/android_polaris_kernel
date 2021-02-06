@@ -1,5 +1,5 @@
 /* Copyright (c) 2014-2015, 2017, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1193,7 +1193,7 @@ static int qpnp_haptics_auto_mode_config(struct hap_chip *chip, int time_ms)
 		/*
 		 * only change pattern for different vibration cycle.
 		 * */
-		if ( chip->effect_max) {
+		if (chip->effect_max) {
 			int i = 0;
 			if (index != chip->effect_index) {
 				if (index >= chip->effect_max) {

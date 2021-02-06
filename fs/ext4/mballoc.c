@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2003-2006, Cluster File Systems, Inc, info@clusterfs.com
- * Copyright (C) 2019 XiaoMi, Inc.
  * Written by Alex Tomas <alex@clusterfs.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -927,9 +926,6 @@ static int ext4_mb_init_cache(struct page *page, char *incore, gfp_t gfp)
 		if ((first_block + i) & 1) {
 			/* this is block of buddy */
 			BUG_ON(incore == NULL);
-			mb_debug(1, "put buddy for group %u in page %lu/%x\n",
-				group, page->index, i * blocksize);
-			trace_ext4_mb_buddy_bitmap_load(sb, group);
 			grinfo = ext4_get_group_info(sb, group);
 			grinfo->bb_fragments = 0;
 			memset(grinfo->bb_counters, 0,
@@ -947,9 +943,6 @@ static int ext4_mb_init_cache(struct page *page, char *incore, gfp_t gfp)
 		} else {
 			/* this is block of bitmap */
 			BUG_ON(incore != NULL);
-			mb_debug(1, "put bitmap for group %u in page %lu/%x\n",
-				group, page->index, i * blocksize);
-			trace_ext4_mb_bitmap_load(sb, group);
 
 			/* see comments in ext4_mb_put_pa() */
 			ext4_lock_group(sb, group);
@@ -2804,8 +2797,6 @@ static inline int ext4_issue_discard(struct super_block *sb,
 	discard_block = (EXT4_C2B(EXT4_SB(sb), cluster) +
 			 ext4_group_first_block_no(sb, block_group));
 	count = EXT4_C2B(EXT4_SB(sb), count);
-	trace_ext4_discard_blocks(sb,
-			(unsigned long long) discard_block, count);
 	return sb_issue_discard(sb, discard_block, count, GFP_NOFS, flags);
 }
 
@@ -2953,9 +2944,6 @@ ext4_mb_mark_diskspace_used(struct ext4_allocation_context *ac,
 	gdp = ext4_get_group_desc(sb, ac->ac_b_ex.fe_group, &gdp_bh);
 	if (!gdp)
 		goto out_err;
-
-	ext4_debug("using block group %u(%d)\n", ac->ac_b_ex.fe_group,
-			ext4_free_group_clusters(sb, gdp));
 
 	BUFFER_TRACE(gdp_bh, "get_write_access");
 	err = ext4_journal_get_write_access(handle, gdp_bh);
@@ -3269,11 +3257,6 @@ static void ext4_mb_collect_stats(struct ext4_allocation_context *ac)
 		if (ac->ac_found > sbi->s_mb_max_to_scan)
 			atomic_inc(&sbi->s_bal_breaks);
 	}
-
-	if (ac->ac_op == EXT4_MB_HISTORY_ALLOC)
-		trace_ext4_mballoc_alloc(ac);
-	else
-		trace_ext4_mballoc_prealloc(ac);
 }
 
 /*
@@ -3689,10 +3672,6 @@ ext4_mb_new_inode_pa(struct ext4_allocation_context *ac)
 	pa->pa_deleted = 0;
 	pa->pa_type = MB_INODE_PA;
 
-	mb_debug(1, "new inode pa %p: %llu/%u for %u\n", pa,
-			pa->pa_pstart, pa->pa_len, pa->pa_lstart);
-	trace_ext4_mb_new_inode_pa(ac, pa);
-
 	ext4_mb_use_inode_pa(ac, pa);
 	atomic_add(pa->pa_free, &sbi->s_mb_preallocated);
 
@@ -3748,10 +3727,6 @@ ext4_mb_new_group_pa(struct ext4_allocation_context *ac)
 	INIT_LIST_HEAD(&pa->pa_group_list);
 	pa->pa_deleted = 0;
 	pa->pa_type = MB_GROUP_PA;
-
-	mb_debug(1, "new group pa %p: %llu/%u for %u\n", pa,
-			pa->pa_pstart, pa->pa_len, pa->pa_lstart);
-	trace_ext4_mb_new_group_pa(ac, pa);
 
 	ext4_mb_use_group_pa(ac, pa);
 	atomic_add(pa->pa_free, &EXT4_SB(sb)->s_mb_preallocated);
@@ -3823,10 +3798,6 @@ ext4_mb_release_inode_pa(struct ext4_buddy *e4b, struct buffer_head *bitmap_bh,
 			 (unsigned) next - bit, (unsigned) group);
 		free += next - bit;
 
-		trace_ext4_mballoc_discard(sb, NULL, group, bit, next - bit);
-		trace_ext4_mb_release_inode_pa(pa, (grp_blk_start +
-						    EXT4_C2B(sbi, bit)),
-					       next - bit);
 		mb_free_blocks(pa->pa_inode, e4b, bit, next - bit);
 		bit = next + 1;
 	}
@@ -3856,13 +3827,11 @@ ext4_mb_release_group_pa(struct ext4_buddy *e4b,
 	ext4_group_t group;
 	ext4_grpblk_t bit;
 
-	trace_ext4_mb_release_group_pa(sb, pa);
 	BUG_ON(pa->pa_deleted == 0);
 	ext4_get_group_no_and_offset(sb, pa->pa_pstart, &group, &bit);
 	BUG_ON(group != e4b->bd_group && pa->pa_len != 0);
 	mb_free_blocks(pa->pa_inode, e4b, bit, pa->pa_len);
 	atomic_add(pa->pa_len, &EXT4_SB(sb)->s_mb_discarded);
-	trace_ext4_mballoc_discard(sb, NULL, group, bit, pa->pa_len);
 
 	return 0;
 }
@@ -4003,9 +3972,6 @@ void ext4_discard_preallocations(struct inode *inode)
 		/*BUG_ON(!list_empty(&ei->i_prealloc_list));*/
 		return;
 	}
-
-	mb_debug(1, "discard preallocation for inode %lu\n", inode->i_ino);
-	trace_ext4_discard_preallocations(inode);
 
 	INIT_LIST_HEAD(&list);
 
@@ -4448,7 +4414,6 @@ static int ext4_mb_discard_preallocations(struct super_block *sb, int needed)
 	int ret;
 	int freed = 0;
 
-	trace_ext4_mb_discard_preallocations(sb, needed);
 	for (i = 0; i < ngroups && needed > 0; i++) {
 		ret = ext4_mb_discard_group_preallocations(sb, i, needed);
 		freed += ret;
@@ -4477,8 +4442,6 @@ ext4_fsblk_t ext4_mb_new_blocks(handle_t *handle,
 	might_sleep();
 	sb = ar->inode->i_sb;
 	sbi = EXT4_SB(sb);
-
-	trace_ext4_request_blocks(ar);
 
 	/* Allow to use superuser reservation for quota file */
 	if (IS_NOQUOTA(ar->inode))
@@ -4589,8 +4552,6 @@ out:
 			percpu_counter_sub(&sbi->s_dirtyclusters_counter,
 						reserv_clstrs);
 	}
-
-	trace_ext4_allocate_blocks(ar, (unsigned long long)block);
 
 	return block;
 }
@@ -4732,9 +4693,6 @@ void ext4_free_blocks(handle_t *handle, struct inode *inode,
 		goto error_return;
 	}
 
-	ext4_debug("freeing block %llu\n", block);
-	trace_ext4_free_blocks(inode, block, count, flags);
-
 	if (bh && (flags & EXT4_FREE_BLOCKS_FORGET)) {
 		BUG_ON(count > 1);
 
@@ -4850,7 +4808,6 @@ do_more:
 			BUG_ON(!mb_test_bit(bit + i, bitmap_bh->b_data));
 	}
 #endif
-	trace_ext4_mballoc_free(sb, inode, block_group, bit, count_clusters);
 
 	/* __GFP_NOFAIL: retry infinitely, ignore TIF_MEMDIE and memcg limit. */
 	err = ext4_mb_load_buddy_gfp(sb, block_group, &e4b,
@@ -4966,8 +4923,6 @@ int ext4_group_add_blocks(handle_t *handle, struct super_block *sb,
 	struct ext4_buddy e4b;
 	int err = 0, ret, blk_free_count;
 	ext4_grpblk_t blocks_freed;
-
-	ext4_debug("Adding block(s) %llu-%llu\n", block, block + count - 1);
 
 	if (count == 0)
 		return 0;
@@ -5102,8 +5057,6 @@ __acquires(bitlock)
 	struct ext4_free_extent ex;
 	int ret = 0;
 
-	trace_ext4_trim_extent(sb, group, start, count);
-
 	assert_spin_locked(ext4_group_lock_ptr(sb, group));
 
 	ex.fe_start = start;
@@ -5150,8 +5103,6 @@ ext4_trim_all_free(struct super_block *sb, ext4_group_t group,
 	ext4_grpblk_t next, count = 0, free_count = 0;
 	struct ext4_buddy e4b;
 	int ret = 0;
-
-	trace_ext4_trim_all_free(sb, group, start, max);
 
 	ret = ext4_mb_load_buddy(sb, group, &e4b);
 	if (ret) {
@@ -5210,9 +5161,6 @@ out:
 	ext4_unlock_group(sb, group);
 	ext4_mb_unload_buddy(&e4b);
 
-	ext4_debug("trimmed %d blocks in the group %d\n",
-		count, group);
-
 	return ret;
 }
 
@@ -5267,18 +5215,10 @@ int ext4_trim_fs(struct super_block *sb, struct fstrim_range *range,
 	end = EXT4_CLUSTERS_PER_GROUP(sb) - 1;
 
 	for (group = first_group; group <= last_group; group++) {
-		/*
-		 * If the trim thread is running and we receive the SCREEN_ON
-		 * event, we will send SIGUSR1 singnal to teriminate the trim
-		 * thread. So if there is a SIGUSR1 signal in current thread,
-		 * set the value of ret to be a negative number to teriminate
-		 * trim thread.
-		 */
 		if (signal_pending(current) && sigismember(&current->pending.signal, SIGUSR1)) {
 			ret = -EINTR;
 			break;
 		}
-
 		grp = ext4_get_group_info(sb, group);
 		/* We only do this if the grp has never been initialized */
 		if (unlikely(EXT4_MB_GRP_NEED_INIT(grp))) {

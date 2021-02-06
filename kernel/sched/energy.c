@@ -148,7 +148,6 @@ void init_sched_energy_costs(void)
 		}
 	}
 
-	pr_info("Sched-energy-costs installed from DT\n");
 	return;
 
 out:
@@ -254,31 +253,10 @@ static int sched_energy_probe(struct platform_device *pdev)
 						break;
 					sge->cap_states[i].cap = cap;
 				}
-
-				dev_dbg(&pdev->dev,
-					"cpu=%d freq=%ld cap=%ld power_d0=%ld\n",
-					cpu, freq, sge_l0->cap_states[i].cap,
-					sge_l0->cap_states[i].power);
 			}
 
 			is_sge_valid = true;
-			dev_info(&pdev->dev,
-				"cpu=%d eff=%d [freq=%ld cap=%ld power_d0=%ld] -> [freq=%ld cap=%ld power_d0=%ld]\n",
-				cpu, efficiency,
-				sge_l0->cap_states[0].frequency,
-				sge_l0->cap_states[0].cap,
-				sge_l0->cap_states[0].power,
-				sge_l0->cap_states[ncapstates - 1].frequency,
-				sge_l0->cap_states[ncapstates - 1].cap,
-				sge_l0->cap_states[ncapstates - 1].power
-				);
 		}
-
-
-		dev_dbg(&pdev->dev,
-			"cpu=%d efficiency=%d max_frequency=%ld max_efficiency=%d cpu_max_capacity=%ld\n",
-			cpu, efficiency, max_frequencies[cpu], max_efficiency,
-			cpu_max_cap);
 
 		arch_update_cpu_capacity(cpu);
 	}
@@ -303,7 +281,6 @@ static int sched_energy_probe(struct platform_device *pdev)
 
 	walt_map_freq_to_load();
 
-	dev_info(&pdev->dev, "Sched-energy-costs capacity updated\n");
 	return 0;
 
 exit_rcu_unlock:

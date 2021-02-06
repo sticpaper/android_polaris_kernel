@@ -1,5 +1,5 @@
 /* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1890,14 +1890,37 @@ static void notify_clients(struct qpnp_adc_tm_sensor *adc_tm)
 	}
 }
 
+static int qpnp_adc_read_temp(void *data, int *temp)
+{
+	struct qpnp_adc_tm_sensor *adc_tm_sensor = data;
+	struct qpnp_adc_tm_chip *chip = adc_tm_sensor->chip;
+	struct qpnp_vadc_result result;
+	int rc = 0;
+
+	rc = qpnp_vadc_read(chip->vadc_dev,
+				adc_tm_sensor->vadc_channel_num, &result);
+	if (rc)
+		return rc;
+
+	*temp = result.physical;
+
+	return rc;
+}
+
 static void notify_adc_tm_fn(struct work_struct *work)
 {
 	struct qpnp_adc_tm_sensor *adc_tm = container_of(work,
 		struct qpnp_adc_tm_sensor, work);
+	int temp;
+	int ret;
 
 	if (adc_tm->thermal_node) {
 		pr_debug("notifying uspace client\n");
-		of_thermal_handle_trip(adc_tm->tz_dev);
+		ret = qpnp_adc_read_temp(adc_tm, &temp);
+		if (ret)
+			of_thermal_handle_trip(adc_tm->tz_dev);
+		else
+			of_thermal_handle_trip_temp(adc_tm->tz_dev, temp);
 	} else {
 		if (adc_tm->scale_type == SCALE_RBATT_THERM)
 			notify_battery_therm(adc_tm);
@@ -2147,7 +2170,7 @@ static int qpnp_adc_tm_disable_rearm_high_thresholds(
 		return rc;
 	}
 
-		queue_work(chip->sensor[sensor_num].req_wq,
+	queue_work(chip->sensor[sensor_num].req_wq,
 		&chip->sensor[sensor_num].work);
 
 	return rc;
@@ -2596,7 +2619,8 @@ static irqreturn_t qpnp_adc_tm_low_thr_isr(int irq, void *data)
 
 static int qpnp_adc_tm_rc_check_sensor_trip(struct qpnp_adc_tm_chip *chip,
 			u8 status_low, u8 status_high, int i,
-			int *sensor_low_notify_num, int *sensor_high_notify_num, int *cnt_low, int *cnt_high)
+			int *sensor_low_notify_num, int *sensor_high_notify_num,
+			int *cnt_low, int *cnt_high)
 {
 	int rc = 0;
 	u8 ctl = 0, sensor_mask = 0;
@@ -2776,38 +2800,27 @@ static irqreturn_t qpnp_adc_tm_rc_thr_isr(int irq, void *data)
 	}
 
 	if (sensor_low_notify_num) {
-		pm_wakeup_event(chip->dev,
-				QPNP_ADC_WAKEUP_SRC_TIMEOUT_MS);
-		queue_work(chip->low_thr_wq, &chip->trigger_low_thr_work);
+		if (!work_pending(&chip->trigger_low_thr_work)) {
+			pm_wakeup_event(chip->dev,
+					QPNP_ADC_WAKEUP_SRC_TIMEOUT_MS);
+			queue_work(chip->low_thr_wq, &chip->trigger_low_thr_work);
+		} else
+			force_enable_int_th(chip, true, false);
 	}
 
 	if (sensor_high_notify_num) {
-		pm_wakeup_event(chip->dev,
-				QPNP_ADC_WAKEUP_SRC_TIMEOUT_MS);
-		queue_work(chip->high_thr_wq,
-				&chip->trigger_high_thr_work);
+		if (!work_pending(&chip->trigger_high_thr_work)) {
+			pm_wakeup_event(chip->dev,
+					QPNP_ADC_WAKEUP_SRC_TIMEOUT_MS);
+			queue_work(chip->high_thr_wq,
+					&chip->trigger_high_thr_work);
+		} else
+			force_enable_int_th(chip, false, true);
 	}
 
 	clear_tmp_low_high(chip);
 
 	return IRQ_HANDLED;
-}
-
-static int qpnp_adc_read_temp(void *data, int *temp)
-{
-	struct qpnp_adc_tm_sensor *adc_tm_sensor = data;
-	struct qpnp_adc_tm_chip *chip = adc_tm_sensor->chip;
-	struct qpnp_vadc_result result;
-	int rc = 0;
-
-	rc = qpnp_vadc_read(chip->vadc_dev,
-				adc_tm_sensor->vadc_channel_num, &result);
-	if (rc)
-		return rc;
-
-	*temp = result.physical;
-
-	return rc;
 }
 
 static struct thermal_zone_of_device_ops qpnp_adc_tm_thermal_ops = {
@@ -3002,21 +3015,21 @@ int32_t qpnp_adc_tm_disable_chan_meas(struct qpnp_adc_tm_chip *chip,
 					QPNP_BTM_Mn_HIGH_THR_INT_EN, false);
 		if (rc < 0) {
 			pr_err("high thr disable err:%d\n", btm_chan_num);
-			return rc;
+			goto fail;
 		}
 
 		rc = qpnp_adc_tm_reg_update(chip, QPNP_BTM_Mn_EN(btm_chan_num),
 				QPNP_BTM_Mn_LOW_THR_INT_EN, false);
 		if (rc < 0) {
 			pr_err("low thr disable err:%d\n", btm_chan_num);
-			return rc;
+			goto fail;
 		}
 
 		rc = qpnp_adc_tm_reg_update(chip, QPNP_BTM_Mn_EN(btm_chan_num),
 				QPNP_BTM_Mn_MEAS_EN, false);
 		if (rc < 0) {
 			pr_err("multi measurement disable failed\n");
-			return rc;
+			goto fail;
 		}
 	}
 

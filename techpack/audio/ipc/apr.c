@@ -40,7 +40,9 @@
 
 static struct apr_q6 q6;
 static struct apr_client client[APR_DEST_MAX][APR_CLIENT_MAX];
+#ifdef CONFIG_IPC_LOGGING
 static void *apr_pkt_ctx;
+#endif
 static wait_queue_head_t dsp_wait;
 static wait_queue_head_t modem_wait;
 static bool is_modem_up;
@@ -89,12 +91,7 @@ static const struct file_operations apr_debug_ops = {
 };
 #endif
 
-#define APR_PKT_INFO(x...) \
-do { \
-	if (apr_pkt_ctx) \
-		ipc_log_string(apr_pkt_ctx, "<APR>: "x); \
-} while (0)
-
+#define APR_PKT_INFO(x...) ((void)0)
 
 struct apr_svc_table {
 	char name[64];
@@ -699,24 +696,6 @@ void apr_cb_func(void *buf, int len, void *priv)
 	if (data.payload_size > 0)
 		data.payload = (char *)hdr + hdr_size;
 
-	if (unlikely(apr_cf_debug)) {
-		if (hdr->opcode == APR_BASIC_RSP_RESULT && data.payload) {
-			uint32_t *ptr = data.payload;
-
-			APR_PKT_INFO(
-			"Rx: src_addr[0x%X] dest_addr[0x%X] opcode[0x%X] token[0x%X] rc[0x%X]",
-			(hdr->src_domain << 8) | hdr->src_svc,
-			(hdr->dest_domain << 8) | hdr->dest_svc,
-			hdr->opcode, hdr->token, ptr[1]);
-		} else {
-			APR_PKT_INFO(
-			"Rx: src_addr[0x%X] dest_addr[0x%X] opcode[0x%X] token[0x%X]",
-			(hdr->src_domain << 8) | hdr->src_svc,
-			(hdr->dest_domain << 8) | hdr->dest_svc, hdr->opcode,
-			hdr->token);
-		}
-	}
-
 	temp_port = ((data.dest_port >> 8) * 8) + (data.dest_port & 0xFF);
 	if (((temp_port >= 0) && (temp_port < APR_MAX_PORTS))
 		&& (c_svc->port_cnt && c_svc->port_fn[temp_port]))
@@ -1056,9 +1035,9 @@ static int __init apr_debug_init(void)
 }
 #else
 static int __init apr_debug_init(void)
-(
+{
 	return 0;
-)
+}
 #endif
 
 static void apr_cleanup(void)
@@ -1078,7 +1057,9 @@ static void apr_cleanup(void)
 				mutex_destroy(&client[i][j].svc[k].m_lock);
 		}
 	}
+#ifdef CONFIG_DEBUG_FS
 	debugfs_remove(debugfs_apr_debug);
+#endif
 }
 
 static int apr_probe(struct platform_device *pdev)
@@ -1111,12 +1092,12 @@ static int apr_probe(struct platform_device *pdev)
 		apr_priv = NULL;
 		return -ENOMEM;
 	}
-
+#ifdef CONFIG_IPC_LOGGING
 	apr_pkt_ctx = ipc_log_context_create(APR_PKT_IPC_LOG_PAGE_CNT,
 						"apr", 0);
 	if (!apr_pkt_ctx)
 		pr_err("%s: Unable to create ipc log context\n", __func__);
-
+#endif
 	spin_lock(&apr_priv->apr_lock);
 	apr_priv->is_initial_boot = true;
 	spin_unlock(&apr_priv->apr_lock);

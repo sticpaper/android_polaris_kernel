@@ -300,7 +300,7 @@
 };
 
 &vendor_fstab {
-	status = "ok";
+	status = "disabled";
 };
 
 &system_fstab {

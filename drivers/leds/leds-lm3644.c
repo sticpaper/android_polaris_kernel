@@ -1,7 +1,6 @@
 /*
 * Simple driver for Texas Instruments LM3644 LED Flash driver chip
 * Copyright (C) 2017 Xiaomi Corp.
-* Copyright (C) 2019 XiaoMi, Inc.
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License version 2 as
@@ -471,7 +470,7 @@ static ssize_t lm3644_ir_read(struct file *filp, char *buf, size_t len, loff_t *
 	struct lm3644_chip_data *chip = filp->private_data;
 
 	data = atomic_read(&chip->ito_exception);
-	if (copy_to_user(buf,&data,sizeof(data)) != 0)
+	if (copy_to_user(buf, &data,sizeof(data)) != 0)
 		dev_err(chip->dev, "copy to user failed!\n");
 
 	return ret;

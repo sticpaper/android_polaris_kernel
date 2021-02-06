@@ -2,7 +2,6 @@
  *  linux/drivers/cpufreq/cpufreq.c
  *
  *  Copyright (C) 2001 Russell King
- *  Copyright (C) 2019 XiaoMi, Inc.
  *            (C) 2002 - 2003 Dominik Brodowski <linux@brodo.de>
  *            (C) 2013 Viresh Kumar <viresh.kumar@linaro.org>
  *
@@ -331,9 +330,8 @@ static DEFINE_PER_CPU(unsigned long, max_freq_cpu);
 static DEFINE_PER_CPU(unsigned long, max_freq_scale) = SCHED_CAPACITY_SCALE;
 static DEFINE_PER_CPU(unsigned long, min_freq_scale);
 
-static void
-scale_freq_capacity(const cpumask_t *cpus, unsigned long cur_freq,
-		    unsigned long max_freq)
+void scale_freq_capacity(const cpumask_t *cpus, unsigned long cur_freq,
+			 unsigned long max_freq)
 {
 	unsigned long scale = (cur_freq << SCHED_CAPACITY_SHIFT) / max_freq;
 	int cpu;
@@ -346,6 +344,7 @@ scale_freq_capacity(const cpumask_t *cpus, unsigned long cur_freq,
 	pr_debug("cpus %*pbl cur freq/max freq %lu/%lu kHz freq scale %lu\n",
 		 cpumask_pr_args(cpus), cur_freq, max_freq, scale);
 }
+EXPORT_SYMBOL_GPL(scale_freq_capacity);
 
 unsigned long cpufreq_scale_freq_capacity(struct sched_domain *sd, int cpu)
 {
@@ -1229,7 +1228,6 @@ static void cpufreq_policy_put_kobj(struct cpufreq_policy *policy, bool notify)
 
 	down_write(&policy->rwsem);
 	cpufreq_stats_free_table(policy);
-	cpufreq_gov_stats_free_table(policy);
 	kobj = &policy->kobj;
 	cmp = &policy->kobj_unregister;
 	up_write(&policy->rwsem);
@@ -1387,7 +1385,6 @@ static int cpufreq_online(unsigned int cpu)
 
 		cpufreq_stats_create_table(policy);
 		cpufreq_times_create_policy(policy);
-		cpufreq_gov_stats_create_table(policy);
 		blocking_notifier_call_chain(&cpufreq_policy_notifier_list,
 				CPUFREQ_CREATE_POLICY, policy);
 
@@ -1963,9 +1960,10 @@ EXPORT_SYMBOL(cpufreq_unregister_notifier);
  * twice in parallel for the same policy and that it will never be called in
  * parallel with either ->target() or ->target_index() for the same policy.
  *
- * If CPUFREQ_ENTRY_INVALID is returned by the driver's ->fast_switch()
- * callback to indicate an error condition, the hardware configuration must be
- * preserved.
+ * Returns the actual frequency set for the CPU.
+ *
+ * If 0 is returned by the driver's ->fast_switch() callback to indicate an
+ * error condition, the hardware configuration must be preserved.
  */
 unsigned int cpufreq_driver_fast_switch(struct cpufreq_policy *policy,
 					unsigned int target_freq)

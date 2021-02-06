@@ -29,7 +29,7 @@
 #define LANE_MASK_3PH 0x7
 
 static int csiphy_dump;
-module_param(csiphy_dump, int, 0644);
+module_param(csiphy_dump, int, 0);
 
 static int cam_csiphy_notify_secure_mode(struct csiphy_device *csiphy_dev,
 	bool protect, int32_t offset)

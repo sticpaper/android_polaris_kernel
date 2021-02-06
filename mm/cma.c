@@ -292,8 +292,6 @@ int __init cma_declare_contiguous(phys_addr_t base,
 #else
 	highmem_start = __pa(high_memory);
 #endif
-	pr_debug("%s(size %pa, base %pa, limit %pa alignment %pa)\n",
-		__func__, &size, &base, &limit, &alignment);
 
 	if (cma_area_count == ARRAY_SIZE(cma_areas)) {
 		pr_err("Not enough slots for CMA reserved regions!\n");
@@ -402,8 +400,6 @@ int __init cma_declare_contiguous(phys_addr_t base,
 	if (ret)
 		goto free_mem;
 
-	pr_info("Reserved %ld MiB at %pa\n", (unsigned long)size / SZ_1M,
-		&base);
 	return 0;
 
 free_mem:
@@ -463,13 +459,8 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
 	if (!cma || !cma->count)
 		return NULL;
 
-	pr_debug("%s(cma %p, count %zu, align %d)\n", __func__, (void *)cma,
-		 count, align);
-
 	if (!count)
 		return NULL;
-
-	trace_cma_alloc_start(count, align);
 
 	mask = cma_bitmap_aligned_mask(cma, align);
 	offset = cma_bitmap_aligned_offset(cma, align);
@@ -535,15 +526,9 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
 		if (ret != -EBUSY)
 			break;
 
-		pr_debug("%s(): memory range at %p is busy, retrying\n",
-			 __func__, pfn_to_page(pfn));
-
-		trace_cma_alloc_busy_retry(pfn, pfn_to_page(pfn), count, align);
 		/* try again with a bit different memory target */
 		start = bitmap_no + mask + 1;
 	}
-
-	trace_cma_alloc(pfn, page, count, align);
 
 	if (ret) {
 		pr_info("%s: alloc failed, req-size: %zu pages, ret: %d\n",
@@ -572,8 +557,6 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
 	if (!cma || !pages)
 		return false;
 
-	pr_debug("%s(page %p)\n", __func__, (void *)pages);
-
 	pfn = page_to_pfn(pages);
 
 	if (pfn < cma->base_pfn || pfn >= cma->base_pfn + cma->count)
@@ -583,7 +566,6 @@ bool cma_release(struct cma *cma, const struct page *pages, unsigned int count)
 
 	free_contig_range(pfn, count);
 	cma_clear_bitmap(cma, pfn, count);
-	trace_cma_release(pfn, pages, count);
 
 	return true;
 }

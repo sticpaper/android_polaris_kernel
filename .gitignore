@@ -116,11 +116,13 @@ all.config
 # Kdevelop4
 *.kdev4
 
-#audio-kernel
-techpack/audio/
-
 # fetched Android config fragments
 kernel/configs/android-*.cfg
+
+# out-kernel
+out
+phone_build.sh
+build.sh
 
 #
 #Ignoring Android.bp link file

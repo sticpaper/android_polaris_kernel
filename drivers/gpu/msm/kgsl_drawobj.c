@@ -43,18 +43,6 @@
 static struct kmem_cache *memobjs_cache;
 static struct kmem_cache *sparseobjs_cache;
 
-static void free_fence_names(struct kgsl_drawobj_sync *syncobj)
-{
-	unsigned int i;
-
-	for (i = 0; i < syncobj->numsyncs; i++) {
-		struct kgsl_drawobj_sync_event *event = &syncobj->synclist[i];
-
-		if (event->type == KGSL_CMD_SYNCPOINT_TYPE_FENCE)
-			kfree(event->info.fences);
-	}
-}
-
 void kgsl_drawobj_destroy_object(struct kref *kref)
 {
 	struct kgsl_drawobj *drawobj = container_of(kref,
@@ -66,7 +54,6 @@ void kgsl_drawobj_destroy_object(struct kref *kref)
 	switch (drawobj->type) {
 	case SYNCOBJ_TYPE:
 		syncobj = SYNCOBJ(drawobj);
-		free_fence_names(syncobj);
 		kfree(syncobj->synclist);
 		kfree(syncobj);
 		break;
@@ -107,12 +94,6 @@ void kgsl_dump_syncpoints(struct kgsl_device *device,
 			break;
 		}
 		case KGSL_CMD_SYNCPOINT_TYPE_FENCE: {
-			int j;
-			struct event_fence_info *info = &event->info;
-
-			for (j = 0; j < info->num_fences; j++)
-				dev_err(device->dev, "[%d]  fence: %s\n",
-					i, info->fences[j].name);
 			break;
 		}
 		}
@@ -146,10 +127,6 @@ static void syncobj_timer(unsigned long data)
 		"kgsl: possible gpu syncpoint deadlock for context %d timestamp %d\n",
 		drawobj->context->id, drawobj->timestamp);
 
-	set_bit(ADRENO_CONTEXT_FENCE_LOG, &drawobj->context->priv);
-	kgsl_context_dump(drawobj->context);
-	clear_bit(ADRENO_CONTEXT_FENCE_LOG, &drawobj->context->priv);
-
 	dev_err(device->dev, "      pending events:\n");
 
 	for (i = 0; i < syncobj->numsyncs; i++) {
@@ -164,12 +141,6 @@ static void syncobj_timer(unsigned long data)
 				i, event->context->id, event->timestamp);
 			break;
 		case KGSL_CMD_SYNCPOINT_TYPE_FENCE: {
-			int j;
-			struct event_fence_info *info = &event->info;
-
-			for (j = 0; j < info->num_fences; j++)
-				dev_err(device->dev, "       [%d] FENCE %s\n",
-					i, info->fences[j].name);
 			break;
 		}
 		}
@@ -355,11 +326,6 @@ EXPORT_SYMBOL(kgsl_drawobj_destroy);
 static bool drawobj_sync_fence_func(void *priv)
 {
 	struct kgsl_drawobj_sync_event *event = priv;
-	int i;
-
-	for (i = 0; i < event->info.num_fences; i++)
-		trace_syncpoint_fence_expire(event->syncobj,
-			event->info.fences[i].name);
 
 	/*
 	 * Only call kgsl_drawobj_put() if it's not marked for cancellation
@@ -385,7 +351,7 @@ static int drawobj_add_sync_fence(struct kgsl_device *device,
 	struct kgsl_cmd_syncpoint_fence *sync = priv;
 	struct kgsl_drawobj *drawobj = DRAWOBJ(syncobj);
 	struct kgsl_drawobj_sync_event *event;
-	unsigned int id, i;
+	unsigned int id;
 
 	kref_get(&drawobj->refcount);
 
@@ -422,9 +388,6 @@ static int drawobj_add_sync_fence(struct kgsl_device *device,
 
 		return ret;
 	}
-
-	for (i = 0; i < event->info.num_fences; i++)
-		trace_syncpoint_fence(syncobj, event->info.fences[i].name);
 
 	return 0;
 }
@@ -518,20 +481,24 @@ int kgsl_drawobj_sync_add_sync(struct kgsl_device *device,
 	struct kgsl_cmd_syncpoint *sync)
 {
 	void *priv;
-	int ret, psize;
+	int psize;
 	struct kgsl_drawobj *drawobj = DRAWOBJ(syncobj);
 	int (*func)(struct kgsl_device *device,
 			struct kgsl_drawobj_sync *syncobj,
 			void *priv);
+	struct kgsl_cmd_syncpoint_timestamp sync_timestamp;
+	struct kgsl_cmd_syncpoint_fence sync_fence;
 
 	switch (sync->type) {
 	case KGSL_CMD_SYNCPOINT_TYPE_TIMESTAMP:
 		psize = sizeof(struct kgsl_cmd_syncpoint_timestamp);
 		func = drawobj_add_sync_timestamp;
+		priv = &sync_timestamp;
 		break;
 	case KGSL_CMD_SYNCPOINT_TYPE_FENCE:
 		psize = sizeof(struct kgsl_cmd_syncpoint_fence);
 		func = drawobj_add_sync_fence;
+		priv = &sync_fence;
 		break;
 	default:
 		KGSL_DRV_ERR(device,
@@ -547,19 +514,10 @@ int kgsl_drawobj_sync_add_sync(struct kgsl_device *device,
 		return -EINVAL;
 	}
 
-	priv = kzalloc(sync->size, GFP_KERNEL);
-	if (priv == NULL)
-		return -ENOMEM;
-
-	if (copy_from_user(priv, sync->priv, sync->size)) {
-		kfree(priv);
+	if (copy_from_user(priv, sync->priv, sync->size))
 		return -EFAULT;
-	}
 
-	ret = func(device, syncobj, priv);
-	kfree(priv);
-
-	return ret;
+	return func(device, syncobj, priv);
 }
 
 static void add_profiling_buffer(struct kgsl_device *device,

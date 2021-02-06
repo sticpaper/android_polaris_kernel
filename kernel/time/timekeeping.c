@@ -24,8 +24,6 @@
 #include <linux/stop_machine.h>
 #include <linux/pvclock_gtod.h>
 #include <linux/compiler.h>
-/* XIAOMI ADD: */
-#include <linux/misysinfofreader.h>
 
 #include "tick-internal.h"
 #include "ntp_internal.h"
@@ -2270,9 +2268,6 @@ struct timespec64 get_monotonic_coarse64(void)
 	return now;
 }
 EXPORT_SYMBOL(get_monotonic_coarse64);
-#ifdef CONFIG_PACKAGE_RUNTIME_INFO
-void __weak package_runtime_monitor(u64 now) {}
-#endif
 
 /*
  * Must hold jiffies_lock
@@ -2280,11 +2275,6 @@ void __weak package_runtime_monitor(u64 now) {}
 void do_timer(unsigned long ticks)
 {
 	jiffies_64 += ticks;
-#ifdef CONFIG_PACKAGE_RUNTIME_INFO
-	package_runtime_monitor(jiffies_64);
-#endif
-	/* XIAOMI ADD: */
-	update_misysinfo_jiffies();
 	calc_global_load(ticks);
 }
 
@@ -2415,4 +2405,14 @@ void xtime_update(unsigned long ticks)
 	do_timer(ticks);
 	write_sequnlock(&jiffies_lock);
 	update_wall_time();
+}
+
+/**
+ * get_total_sleep_time_nsec() - returns total sleep time in nanoseconds
+ */
+s64 get_total_sleep_time_nsec(void)
+{
+	struct timekeeper *tk = &tk_core.timekeeper;
+
+	return ktime_to_ns(tk->offs_boot);
 }

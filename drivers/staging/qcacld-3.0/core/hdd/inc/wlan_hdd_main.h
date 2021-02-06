@@ -324,6 +324,7 @@ enum hdd_driver_flags {
 
 #define WLAN_CHIP_VERSION   "WCNSS"
 
+#ifdef WLAN_DEBUG
 #define hdd_alert(params...) QDF_TRACE_FATAL(QDF_MODULE_ID_HDD, params)
 #define hdd_err(params...) QDF_TRACE_ERROR(QDF_MODULE_ID_HDD, params)
 #define hdd_warn(params...) QDF_TRACE_WARN(QDF_MODULE_ID_HDD, params)
@@ -350,6 +351,36 @@ enum hdd_driver_flags {
 #define hdd_enter() hdd_debug("enter")
 #define hdd_enter_dev(dev) hdd_debug("enter(%s)", (dev)->name)
 #define hdd_exit() hdd_debug("exit")
+
+#else /* WLAN_DEBUG */
+
+/* Needed to avoid problems caused by disabling debug
+ * but different stuff still being passed to these loggers */
+#define noop ({ do { } while (0); })
+
+#define hdd_alert(params...) noop
+#define hdd_err(params...) noop
+#define hdd_warn(params...) noop
+#define hdd_info(params...) noop
+#define hdd_debug(params...) noop
+
+#define hdd_nofl_alert(params...) noop
+#define hdd_nofl_err(params...) noop
+#define hdd_nofl_warn(params...) noop
+#define hdd_nofl_info(params...) noop
+#define hdd_nofl_debug(params...) noop
+
+#define hdd_alert_rl(params...) noop
+#define hdd_err_rl(params...) noop
+#define hdd_warn_rl(params...) noop
+#define hdd_info_rl(params...) noop
+#define hdd_debug_rl(params...) noop
+
+#define hdd_enter() noop
+#define hdd_enter_dev(dev) noop
+#define hdd_exit() noop
+
+#endif /* WLAN_DEBUG */
 
 #define WLAN_HDD_GET_PRIV_PTR(__dev__) \
 		(struct hdd_adapter *)(netdev_priv((__dev__)))
@@ -1867,7 +1898,6 @@ struct hdd_context {
 	/** P2P Device MAC Address for the adapter  */
 	struct qdf_mac_addr p2p_device_address;
 
-	qdf_wake_lock_t rx_wake_lock;
 	qdf_wake_lock_t sap_wake_lock;
 
 	void *hdd_ipa;

@@ -4,7 +4,6 @@
  * Written by Stephen C. Tweedie <sct@redhat.com>, 1998
  *
  * Copyright 1998 Red Hat corp --- All Rights Reserved
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This file is part of the Linux kernel and is made available under
  * the terms of the GNU General Public License, version 2, or at your
@@ -315,8 +314,6 @@ alloc_transaction:
 			return -ENOMEM;
 	}
 
-	jbd_debug(3, "New handle %p going live.\n", handle);
-
 	/*
 	 * We need to hold j_state_lock until t_updates has been incremented,
 	 * for proper journal barrier handling
@@ -382,10 +379,7 @@ repeat:
 	handle->h_start_jiffies = jiffies;
 	atomic_inc(&transaction->t_updates);
 	atomic_inc(&transaction->t_handle_count);
-	jbd_debug(4, "Handle %p given %d credits (total %d, free %lu)\n",
-		  handle, blocks,
-		  atomic_read(&transaction->t_outstanding_credits),
-		  jbd2_log_space_left(journal));
+
 	read_unlock(&journal->j_state_lock);
 	current->journal_info = handle;
 
@@ -466,9 +460,6 @@ handle_t *jbd2__journal_start(journal_t *journal, int nblocks, int rsv_blocks,
 	}
 	handle->h_type = type;
 	handle->h_line_no = line_no;
-	trace_jbd2_handle_start(journal->j_fs_dev->bd_dev,
-				handle->h_transaction->t_tid, type,
-				line_no, nblocks);
 	return handle;
 }
 EXPORT_SYMBOL(jbd2__journal_start);
@@ -578,8 +569,6 @@ int jbd2_journal_extend(handle_t *handle, int nblocks)
 
 	/* Don't extend a locked-down transaction! */
 	if (transaction->t_state != T_RUNNING) {
-		jbd_debug(3, "denied handle %p %d blocks: "
-			  "transaction not running\n", handle, nblocks);
 		goto error_out;
 	}
 
@@ -588,31 +577,20 @@ int jbd2_journal_extend(handle_t *handle, int nblocks)
 				   &transaction->t_outstanding_credits);
 
 	if (wanted > journal->j_max_transaction_buffers) {
-		jbd_debug(3, "denied handle %p %d blocks: "
-			  "transaction too large\n", handle, nblocks);
 		atomic_sub(nblocks, &transaction->t_outstanding_credits);
 		goto unlock;
 	}
 
 	if (wanted + (wanted >> JBD2_CONTROL_BLOCKS_SHIFT) >
 	    jbd2_log_space_left(journal)) {
-		jbd_debug(3, "denied handle %p %d blocks: "
-			  "insufficient log space\n", handle, nblocks);
 		atomic_sub(nblocks, &transaction->t_outstanding_credits);
 		goto unlock;
 	}
-
-	trace_jbd2_handle_extend(journal->j_fs_dev->bd_dev,
-				 transaction->t_tid,
-				 handle->h_type, handle->h_line_no,
-				 handle->h_buffer_credits,
-				 nblocks);
 
 	handle->h_buffer_credits += nblocks;
 	handle->h_requested_credits += nblocks;
 	result = 0;
 
-	jbd_debug(3, "extended handle %p by %d\n", handle, nblocks);
 unlock:
 	spin_unlock(&transaction->t_handle_lock);
 error_out:
@@ -672,7 +650,6 @@ int jbd2__journal_restart(handle_t *handle, int nblocks, gfp_t gfp_mask)
 	handle->h_transaction = NULL;
 	current->journal_info = NULL;
 
-	jbd_debug(2, "restarting handle %p\n", handle);
 	need_to_start = !tid_geq(journal->j_commit_request, tid);
 	read_unlock(&journal->j_state_lock);
 	if (need_to_start)
@@ -828,8 +805,6 @@ do_get_write_access(handle_t *handle, struct journal_head *jh,
 		return -EROFS;
 	journal = transaction->t_journal;
 
-	jbd_debug(5, "journal_head %p, force_copy %d\n", jh, force_copy);
-
 	JBUFFER_TRACE(jh, "entry");
 repeat:
 	bh = jh2bh(jh);
@@ -842,9 +817,6 @@ repeat:
 
 	/* If it takes too long to lock the buffer, trace it */
 	time_lock = jbd2_time_diff(start_lock, jiffies);
-	if (time_lock > HZ/10)
-		trace_jbd2_lock_buffer_stall(bh->b_bdev->bd_dev,
-			jiffies_to_msecs(time_lock));
 
 	/* We now hold the buffer lock so it is safe to query the buffer
 	 * state.  Is the buffer dirty?
@@ -1116,7 +1088,6 @@ int jbd2_journal_get_create_access(handle_t *handle, struct buffer_head *bh)
 	struct journal_head *jh = jbd2_journal_add_journal_head(bh);
 	int err;
 
-	jbd_debug(5, "journal_head %p\n", jh);
 	err = -EROFS;
 	if (is_handle_aborted(handle))
 		goto out;
@@ -1338,7 +1309,6 @@ int jbd2_journal_dirty_metadata(handle_t *handle, struct buffer_head *bh)
 	 * of the running transaction.
 	 */
 	jh = bh2jh(bh);
-	jbd_debug(5, "journal_head %p\n", jh);
 	JBUFFER_TRACE(jh, "entry");
 
 	/*
@@ -1662,15 +1632,6 @@ int jbd2_journal_stop(handle_t *handle)
 		return err;
 	}
 
-	jbd_debug(4, "Handle %p going down\n", handle);
-	trace_jbd2_handle_stats(journal->j_fs_dev->bd_dev,
-				transaction->t_tid,
-				handle->h_type, handle->h_line_no,
-				jiffies - handle->h_start_jiffies,
-				handle->h_sync, handle->h_requested_credits,
-				(handle->h_requested_credits -
-				 handle->h_buffer_credits));
-
 	/*
 	 * Implement synchronous transaction batching.  If the handle
 	 * was synchronous, don't force a commit immediately.  Let's
@@ -1743,12 +1704,7 @@ int jbd2_journal_stop(handle_t *handle)
 	    (atomic_read(&transaction->t_outstanding_credits) >
 	     journal->j_max_transaction_buffers) ||
 	    time_after_eq(jiffies, transaction->t_expires)) {
-		/* Do this even for aborted journals: an abort still
-		 * completes the commit thread, it just doesn't write
-		 * anything to disk. */
 
-		jbd_debug(2, "transaction too old, requesting commit for "
-					"handle %p\n", handle);
 		/* This is non-blocking */
 		jbd2_log_start_commit(journal, transaction->t_tid);
 
@@ -2499,22 +2455,13 @@ static int jbd2_journal_file_inode(handle_t *handle, struct jbd2_inode *jinode,
 		return -EROFS;
 	journal = transaction->t_journal;
 
-	jbd_debug(4, "Adding inode %lu, tid:%d\n", jinode->i_vfs_inode->i_ino,
-			transaction->t_tid);
-
 	spin_lock(&journal->j_list_lock);
 	jinode->i_flags |= flags;
 
-	/* Is inode already attached where we need it? */
 	if (jinode->i_transaction == transaction ||
 	    jinode->i_next_transaction == transaction)
 		goto done;
 
-	/*
-	 * We only ever set this variable to 1 so the test is safe. Since
-	 * t_need_data_flush is likely to be set, we do the test to save some
-	 * cacheline bouncing
-	 */
 	if (!transaction->t_need_data_flush)
 		transaction->t_need_data_flush = 1;
 	/* On some different transaction's list - should be

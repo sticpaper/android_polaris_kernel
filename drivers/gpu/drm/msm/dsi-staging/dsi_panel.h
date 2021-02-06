@@ -245,6 +245,7 @@ struct dsi_panel {
 	bool sync_broadcast_en;
 
 	struct dsi_panel_exd_config exd_config;
+
 	u32 panel_on_dimming_delay;
 	u32 last_bl_lvl;
 	struct delayed_work cmds_work;
@@ -271,19 +272,6 @@ struct dsi_panel {
 	u32 dc_threshold;
 	ktime_t fod_hbm_off_time;
 	bool dc_enable;
-	/* Display count */
-	u64 boottime;
-	u64 bootRTCtime;
-	u64 bootdays;
-	u64 panel_active;
-	u64 kickoff_count;
-	u64 bl_duration;
-	u64 bl_level_integral;
-	u64 bl_highlevel_duration;
-	u64 bl_lowlevel_duration;
-	u64 hbm_duration;
-	u64 hbm_times;
-	u64 panel_dead;
 };
 
 static inline bool dsi_panel_ulps_feature_enabled(struct dsi_panel *panel)

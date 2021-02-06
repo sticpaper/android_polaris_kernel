@@ -16,7 +16,7 @@
 #include "cam_debug_util.h"
 
 static uint debug_mdl;
-module_param(debug_mdl, uint, 0644);
+module_param(debug_mdl, uint, 0);
 
 const char *cam_get_module_name(unsigned int module_id)
 {

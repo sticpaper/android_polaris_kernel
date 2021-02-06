@@ -976,8 +976,7 @@ int ipa3_wwan_update_mux_channel_prop(void)
 		else
 			rmnet_ipa3_ctx->a7_ul_flt_set = true;
 	}
-	/* update Tx/Rx/Ext property */
-	IPAWANDBG("update Tx/Rx/Ext property in IPA\n");
+
 	if (rmnet_ipa3_ctx->rmnet_index == 0) {
 		IPAWANDBG("no Tx/Rx/Ext property registered in IPA\n");
 		return ret;
@@ -988,14 +987,8 @@ int ipa3_wwan_update_mux_channel_prop(void)
 	for (i = 0; i < rmnet_ipa3_ctx->rmnet_index; i++) {
 		ret = ipa3_wwan_register_to_ipa(i);
 		if (ret < 0) {
-			IPAWANERR("failed to re-regist %s, mux %d, index %d\n",
-				rmnet_ipa3_ctx->mux_channel[i].vchannel_name,
-				rmnet_ipa3_ctx->mux_channel[i].mux_id,
-				i);
 			return -ENODEV;
 		}
-		IPAWANERR("dev(%s) has registered to IPA\n",
-		rmnet_ipa3_ctx->mux_channel[i].vchannel_name);
 		rmnet_ipa3_ctx->mux_channel[i].ul_flt_reg = true;
 	}
 	return ret;
@@ -2852,7 +2845,8 @@ static void tethering_stats_poll_queue(struct work_struct *work)
 
 	/* Schedule again only if there's an active polling interval */
 	if (ipa3_rmnet_ctx.polling_interval != 0)
-		schedule_delayed_work(&ipa_tether_stats_poll_wakequeue_work,
+		queue_delayed_work(system_power_efficient_wq,
+			&ipa_tether_stats_poll_wakequeue_work,
 			msecs_to_jiffies(ipa3_rmnet_ctx.polling_interval*1000));
 }
 
@@ -2946,7 +2940,8 @@ int rmnet_ipa3_poll_tethering_stats(struct wan_ioctl_poll_tethering_stats *data)
 		return 0;
 	}
 
-	schedule_delayed_work(&ipa_tether_stats_poll_wakequeue_work, 0);
+	queue_delayed_work(system_power_efficient_wq,
+						&ipa_tether_stats_poll_wakequeue_work, 0);
 	return 0;
 }
 

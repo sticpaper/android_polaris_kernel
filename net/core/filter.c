@@ -5,7 +5,6 @@
  * internal format has been designed by PLUMgrid:
  *
  *	Copyright (c) 2011 - 2014 PLUMgrid, http://plumgrid.com
- *	Copyright (C) 2019 XiaoMi, Inc.
  *
  * Authors:
  *
@@ -2577,10 +2576,6 @@ static const struct bpf_func_proto bpf_get_socket_uid_proto = {
 	.arg1_type      = ARG_PTR_TO_CTX,
 };
 
-/*
- * simple hash function for a string,
- * http://www.cse.yorku.ca/~oz/hash.html
- */
 static u64 hash_string(const char *str)
 {
 	u64 hash = 5381;

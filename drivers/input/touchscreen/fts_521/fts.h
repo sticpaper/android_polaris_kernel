@@ -149,12 +149,6 @@ do {\
 
 #define TSP_BUF_SIZE						PAGE_SIZE
 
-#define CONFIG_FTS_TOUCH_COUNT_DUMP
-
-#ifdef CONFIG_FTS_TOUCH_COUNT_DUMP
-#define TOUCH_COUNT_FILE_MAXSIZE 50
-#endif
-
 /**
  * Struct which contains information about the HW platform and set up
  */
@@ -169,9 +163,6 @@ struct fts_config_info {
 	u8 tp_hw_version;
 	const char *fts_cfg_name;
 	const char *fts_limit_name;
-#ifdef CONFIG_FTS_TOUCH_COUNT_DUMP
-		const char *clicknum_file_name;
-#endif
 };
 
 struct fts_hw_platform_data {
@@ -191,24 +182,8 @@ struct fts_hw_platform_data {
 	size_t nbuttons;
 	int *key_code;
 #endif
-#ifdef CONFIG_FTS_TOUCH_COUNT_DUMP
-	bool dump_click_count;
-#endif
 	unsigned long keystates;
 	bool check_display_name;
-#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE_GAMEMODE
-	u32 touch_up_threshold_min;
-	u32 touch_up_threshold_max;
-	u32 touch_up_threshold_def;
-	u32 touch_tolerance_min;
-	u32 touch_tolerance_max;
-	u32 touch_tolerance_def;
-	u32 edgefilter_leftright_def;
-	u32 edgefilter_topbottom_def;
-	u32 edgefilter_area_step1;
-	u32 edgefilter_area_step2;
-	u32 edgefilter_area_step3;
-#endif
 };
 
 /*
@@ -224,12 +199,6 @@ typedef void (*event_dispatch_handler_t)
  (struct fts_ts_info *info, unsigned char *data);
 
 #ifdef CONFIG_SECURE_TOUCH
-/*
-struct fts_secure_delay {
-	bool palm_pending;
-	int palm_value;
-};
-*/
 
 struct fts_secure_info {
 	bool secure_inited;
@@ -238,8 +207,6 @@ struct fts_secure_info {
 	atomic_t st_pending_irqs;
 	struct completion st_irq_processed;
 	struct completion st_powerdown;
-//	struct fts_secure_delay scr_delay;
-//	struct mutex palm_lock;
 	void *fts_info;
 };
 #endif
@@ -342,12 +309,8 @@ struct fts_ts_info {
 #ifdef CONFIG_TOUCHSCREEN_ST_DEBUG_FS
 	struct dentry *debugfs;
 #endif
-	int dbclick_count;
-#ifdef CONFIG_FTS_TOUCH_COUNT_DUMP
 	struct class *fts_tp_class;
 	struct device *fts_touch_dev;
-	char *current_clicknum_file;
-#endif
 #ifdef CONFIG_SECURE_TOUCH
 	struct fts_secure_info *secure_info;
 #endif
@@ -359,18 +322,6 @@ struct fts_ts_info {
 	atomic_t system_is_resetting;
 	unsigned int fod_status;
 	bool irq_status;
-#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
-#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE_SENSOR
-	bool p_sensor_switch;
-	bool p_sensor_changed;
-
-	int palm_sensor_switch;
-	bool palm_sensor_changed;
-#endif
-#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE_GAMEMODE
-	wait_queue_head_t wait_queue;
-#endif
-#endif
 	bool dev_pm_suspend;
 	struct completion dev_pm_suspend_completion;
 };

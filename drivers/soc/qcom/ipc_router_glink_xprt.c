@@ -30,7 +30,7 @@
 
 static int ipc_router_glink_xprt_debug_mask;
 module_param_named(debug_mask, ipc_router_glink_xprt_debug_mask,
-		   int, 0664);
+		   int, 0);
 
 #define IPCRTR_INTENT_REQ_TIMEOUT_MS 5000
 #if defined(DEBUG)

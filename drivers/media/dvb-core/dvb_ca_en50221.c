@@ -43,7 +43,7 @@
 
 static int dvb_ca_en50221_debug;
 
-module_param_named(cam_debug, dvb_ca_en50221_debug, int, 0644);
+module_param_named(cam_debug, dvb_ca_en50221_debug, int, 0);
 MODULE_PARM_DESC(cam_debug, "enable verbose debug messages");
 
 #define dprintk if (dvb_ca_en50221_debug) printk

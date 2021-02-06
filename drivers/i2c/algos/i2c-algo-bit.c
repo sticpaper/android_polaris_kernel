@@ -25,7 +25,6 @@
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
 
-
 /* ----- global defines ----------------------------------------------- */
 
 #ifdef DEBUG
@@ -42,7 +41,7 @@
 /* ----- global variables ---------------------------------------------	*/
 
 static int bit_test;	/* see if the line-setting functions work	*/
-module_param(bit_test, int, S_IRUGO);
+module_param(bit_test, int, 0);
 MODULE_PARM_DESC(bit_test, "lines testing - 0 off; 1 report; 2 fail if stuck");
 
 #ifdef DEBUG

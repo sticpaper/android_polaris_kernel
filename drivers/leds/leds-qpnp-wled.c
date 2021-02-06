@@ -1,5 +1,5 @@
 /* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -576,13 +576,7 @@ static int qpnp_wled_set_level(struct qpnp_wled *wled, int level)
 {
 	int i, rc;
 	u8 reg;
-#if 0 // remove backlight lower limit
-	u16 low_limit = WLED_MAX_LEVEL_4095 * 4 / 1000;
 
-	/* WLED's lower limit of operation is 0.4% */
-	if (level > 0 && level < low_limit)
-		level = low_limit;
-#endif
 	/* set brightness registers */
 	for (i = 0; i < wled->max_strings; i++) {
 		reg = level & QPNP_WLED_BRIGHT_LSB_MASK;
@@ -1401,7 +1395,7 @@ static int wled_auto_calibrate(struct qpnp_wled *wled)
 	}
 
 	if (sink_valid == sink_config) {
-		pr_info("WLED auto-calibration complete, default sink-config=%x OK!\n",
+		pr_debug("WLED auto-calibration complete, default sink-config=%x OK!\n",
 						sink_config);
 	} else {
 		pr_warn("Invalid WLED default sink config=%x changing it to=%x\n",
@@ -2758,7 +2752,7 @@ static int qpnp_wled_probe(struct platform_device *pdev)
 		return -EPROBE_DEFER;
 	}
 
-	pr_info("PMIC subtype %d Digital major %d\n",
+	pr_debug("PMIC subtype %d Digital major %d\n",
 		wled->pmic_rev_id->pmic_subtype, wled->pmic_rev_id->rev4);
 
 	wled->wq = alloc_ordered_workqueue("qpnp_wled_wq", WQ_HIGHPRI);

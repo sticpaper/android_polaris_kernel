@@ -161,6 +161,7 @@ static irqreturn_t nqx_dev_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+#ifndef CONFIG_MACH_XIAOMI
 static int is_data_available_for_read(struct nqx_dev *nqx_dev)
 {
 	int ret;
@@ -169,6 +170,7 @@ static int is_data_available_for_read(struct nqx_dev *nqx_dev)
 	ret = wait_event_interruptible(nqx_dev->read_wq, !nqx_dev->irq_enabled);
 	return ret;
 }
+#endif
 
 static ssize_t nfc_read(struct file *filp, char __user *buf,
 					size_t count, loff_t *offset)
@@ -185,9 +187,6 @@ static ssize_t nfc_read(struct file *filp, char __user *buf,
 
 	if (count > nqx_dev->kbuflen)
 		count = nqx_dev->kbuflen;
-
-	dev_dbg(&nqx_dev->client->dev, "%s : reading %zu bytes.\n",
-			__func__, count);
 
 	mutex_lock(&nqx_dev->read_mutex);
 
@@ -520,7 +519,6 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 				dev_err(&nqx_dev->client->dev, "unable to disable clock\n");
 #endif
 		}
-
 		nqx_dev->nfc_ven_enabled = false;
 	} else if (arg == 1) {
 		nqx_enable_irq(nqx_dev);
@@ -702,11 +700,6 @@ static const struct file_operations nfc_dev_fops = {
 	.compat_ioctl = nfc_compat_ioctl
 #endif
 };
-
-/**
- * Do not need check availability of NFCC.
- * This function will block NFCC to enter FW download mode.
- */
 
 #if 0
 /* Check for availability of NQ_ NFC controller hardware */

@@ -2,7 +2,7 @@
  * xHCI host controller driver
  *
  * Copyright (C) 2008 Intel Corp.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * Author: Sarah Sharp
  * Some code borrowed from the Linux EHCI driver.
@@ -346,19 +346,16 @@ static int xhci_abort_cmd_ring(struct xhci_hcd *xhci, unsigned long flags)
 	 * CRR negated in a timely manner, then it should assume
 	 * that the there are larger problems with the xHC and assert HCRST.
 	 */
-
 	if (connected_usb_idVendor == 0x2717 && connected_usb_idProduct == 0x3801) {
 		delay = 500 * 1000;
 		pr_err("xhci_abort_cmd_ring em headset\n");
-	}
-	else {
+	} else {
 		delay = 5000 * 1000;
 		pr_err("xhci_abort_cmd_ring other\n");
 	}
 
 	ret = xhci_handshake_check_state(xhci, &xhci->op_regs->cmd_ring,
 			CMD_RING_RUNNING, 0, 1000 * 1000);
-
 	if (ret < 0) {
 		xhci_err(xhci,
 			 "Stop command ring failed, maybe the host is dead\n");
@@ -1313,7 +1310,7 @@ void xhci_handle_command_timeout(struct work_struct *work)
 		xhci_dbg(xhci, "Command timeout\n");
 		ret = xhci_abort_cmd_ring(xhci, flags);
 		if (ret == -1) {
-			xhci_err(xhci, "Abort command ring failed reset usb device\n");
+			xhci_err(xhci, "Abort command ring failed reset USB device\n");
 			xhci_cleanup_command_queue(xhci);
 			spin_unlock_irqrestore(&xhci->lock, flags);
 			kick_usbpd_vbus_sm();

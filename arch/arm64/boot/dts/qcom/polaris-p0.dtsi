@@ -1,4 +1,3 @@
-
 /* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  * Copyright (C) 2019 XiaoMi, Inc.
  *
@@ -16,7 +15,7 @@
 #include "sdm845-pmic-overlay.dtsi"
 #include "sdm845-pinctrl-overlay.dtsi"
 #include "polaris-camera-sensor-mtp.dtsi"
-#include "xiaomi-sde-display.dtsi"
+#include "display.dtsi"
 
 &qupv3_se10_i2c {
 #include "smb1355.dtsi"
@@ -28,14 +27,6 @@
 
 &qcom_seecom {
 	reg = <0x86d00000 0x03c00000>;
-};
-
-&reserved_memory {
-		ramdump_fb_mem: ramdump_fb_region@af000000 {
-			compatible = "removed-dma-pool";
-			no-map;
-			reg = <0 0xaf000000 0 0x1000000>;
-		};
 };
 
 &vendor {
@@ -158,7 +149,6 @@
 		status = "ok";
 		touch,name = "xiaomi-touch";
 	};
-
 };
 
 &labibb {
@@ -167,12 +157,6 @@
 };
 
 &dsi_jdi_fhd_nt35596s_video {
-	qcom,panel-supply-entries = <&dsi_nt35596s_panel_pwr_supply>;
-	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
-	qcom,platform-reset-gpio = <&tlmm 6 0>;
-};
-
-&dsi_ebbg_fhd_ft8716_video {
 	qcom,panel-supply-entries = <&dsi_nt35596s_panel_pwr_supply>;
 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 	qcom,platform-reset-gpio = <&tlmm 6 0>;
@@ -222,7 +206,7 @@
 };
 
 &pmi8998_haptics {
-	qcom,vmax-mv = <2552>;
+	qcom,vmax-mv = <2480>;
 	qcom,lra-auto-mode;
 	qcom,wave-play-rate-us = <4878>;
 	qcom,wave-shape = "sine";
@@ -309,9 +293,8 @@
 &vendor{
 	mtp_batterydata: qcom,battery-data {
 		qcom,batt-id-range-pct = <15>;
-		#include "batterydata-d5-atl-3400mAh.dtsi"
-		#include "batterydata-d5-cos-3400mAh.dtsi"
-		#include "batterydata-itech-3020mAh.dtsi"
+		#include "batterydata-atl.dtsi"
+		#include "batterydata-cos.dtsi"
 	};
 
 	extcon_usb1: extcon_usb1 {
@@ -330,7 +313,7 @@
 	qcom,fcc-hot-temp-delta = <1650000>;
 	qcom,fcc-cool-temp-delta = <2310000>;
 	qcom,auto-recharge-soc;
-	 qcom,sw-jeita-enable;
+	qcom,sw-jeita-enable;
 	qcom,dynamic-fv-enable;
 	qcom,wireless-flag;
 	qcom,wireless-support;
@@ -416,9 +399,9 @@
 		interrupts = <63 0>;
 		interrupt-names = "nfc_irq";
 		pinctrl-names = "nfc_active", "nfc_suspend";
-		 pinctrl-0 = <&nfc_int_active
-		              &nfc_enable_active
-		              &nfc_clk_default>;
+                pinctrl-0 = <&nfc_int_active
+                             &nfc_enable_active
+                             &nfc_clk_default>;
 		pinctrl-1 = <&nfc_int_suspend &nfc_enable_suspend>;
 		clocks = <&clock_rpmh RPMH_LN_BB_CLK3>;
 		clock-names = "ref_clk";
@@ -485,9 +468,6 @@
 		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend";
 		pinctrl-0 = <&ts_active>;
 		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
-		/*synaptics,palm-rx-channel = <10>;*/
-		/*synaptics,palm-rx-area = <400>;*/
-		/*synaptics,palm-tx-disable = <4>;*/
 		synaptics,drm-dsi-reset = <&tlmm 6 0>;
 		synaptics,reset-gpio = <&tlmm 99 0x00>;
 		synaptics,irq-gpio = <&tlmm  125 0x2008>;
@@ -518,54 +498,6 @@
 			synaptics,fw-name = "synaptics_jdi_3330_d5x.fw";
 		};
 	};
-	ft5x46_i2c@38 {
-		compatible = "ft,ft5x46_i2c";
-		reg = <0x38>;
-		interrupt-parent = <&tlmm>;
-		interrupts = <125 0x2008>;
-		vddio-supply = <&tp_vddio_vreg>;
-		vdd-supply = <&pm8998_l14>;
-		lab-supply = <&lab_regulator>;
-		ibb-supply = <&ibb_regulator>;
-		/* pins used by touchscreen */
-		pinctrl-names = "pmx_ts_active","pmx_ts_suspend";
-		pinctrl-0 = <&ts_active>;
-		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
-		ft5x46_i2c,i2c-pull-up;
-		ft5x46_i2c,irqflags = <0x2008>;
-		ft5x46_i2c,x-max = <1080>;
-		ft5x46_i2c,y-max = <2160>;
-		ft5x46_i2c,z-max = <255>;
-		ft5x46_i2c,w-max = <200>;
-		ft5x46_i2c,reset-gpio = <&tlmm 99 0x00>;
-		ft5x46_i2c,irq-gpio = <&tlmm 125 0x2008>;
-		ft5x46_i2c,skip-reset-in-resume;
-		ft5x46_i2c,landing-jiffies = <1000>;
-		ft5x46_i2c,landing-threshold = <16>;
-		ft5x46_i2c,staying-threshold = <8>;
-		ft5x46_i2c,raw-min = <7000>;
-		ft5x46_i2c,raw-max = <10000>;
-		ft5x46_i2c,open-min = <60>;
-		ft5x46_i2c,open-max = <200>;
-		ft5x46_i2c,short-min = <200>;
-		ft5x46_i2c,short-max = <100000000>;
-		ft5x46_i2c,fw-delay-55-ms = <2>;
-		ft5x46_i2c,fw-delay-aa-ms = <2>;
-		ft5x46_i2c,fw-upgrade-id1 = <0xE7>;
-		ft5x46_i2c,fw-upgrade-id2 = <0xA6>;
-		ft5x46_i2c,fw-delay-readid-ms = <20>;
-		ft5x46_i2c,firmware-array-size = <1>;
-		ft5x46_i2c,cfg_0 {
-			ft5x46_i2c,chip = <0x87>;
-			ft5x46_i2c,vendor = <0x32>;
-			ft5x46_i2c,tp-vendor = <0x31>;
-			ft5x46_i2c,lcd-vendor = <0x37>;
-			ft5x46_i2c,fw-name = "ft8716_ebbg_incell_ebbg_d5x.fw";
-			ft5x46_i2c,tx-num = <24>;
-			ft5x46_i2c,rx-num = <13>;
-		};
-	};
-
 };
 
 &qupv3_se6_4uart {
@@ -597,7 +529,7 @@
 	pmi8998_flashlight: qcom,flashlight {
 		label = "flash";
 		qcom,led-name = "flashlight";
-		qcom,max-current = <750>;
+		qcom,max-current = <680>;
 		qcom,default-led-trigger = "flashlight_trigger";
 		qcom,id = <3>;
 		qcom,current-ma = <500>;
@@ -789,6 +721,7 @@
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
 		thermal-sensors = <&pm8998_adc_tm 0x4c>;
+		wake-capable-sensor;
 		thermal-governor = "user_space";
 
 		trips {
@@ -804,6 +737,7 @@
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
 		thermal-sensors = <&pm8998_adc_tm 0x4d>;
+		wake-capable-sensor;
 		thermal-governor = "user_space";
 
 		trips {
@@ -819,6 +753,7 @@
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
 		thermal-sensors = <&pm8998_adc_tm 0x4e>;
+		wake-capable-sensor;
 		thermal-governor = "user_space";
 
 		trips {
@@ -834,6 +769,7 @@
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
 		thermal-sensors = <&pm8998_adc_tm 0x4f>;
+		wake-capable-sensor;
 		thermal-governor = "user_space";
 
 		trips {
@@ -849,6 +785,7 @@
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
 		thermal-sensors = <&pm8998_adc_tm 0x50>;
+		wake-capable-sensor;
 		thermal-governor = "user_space";
 
 		trips {
@@ -864,6 +801,7 @@
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
 		thermal-sensors = <&pm8998_adc_tm 0x51>;
+		wake-capable-sensor;
 		thermal-governor = "user_space";
 
 		trips {
@@ -925,4 +863,3 @@
 			mi,limit_pd_vbus = <1>;
 			mi,pd_vbus_max_limit = <9000000>;
 };
-

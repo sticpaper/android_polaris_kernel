@@ -68,6 +68,10 @@
  * structure.
  */
 
+#if defined(CONFIG_ANDROID) && !defined(CONFIG_DEBUG_FS)
+#define CONFIG_DEBUG_FS
+#endif
+
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/init.h>
@@ -557,11 +561,10 @@ static struct kmemleak_object *create_object(unsigned long ptr, size_t size,
 	struct kmemleak_object *object, *parent;
 	struct rb_node **link, *rb_parent;
 
-	object = kmem_cache_alloc(object_cache, gfp_kmemleak_mask(gfp));
-	if (!object) {
-		pr_warn("Cannot allocate a kmemleak_object structure\n");
-		kmemleak_disable();
-		return NULL;
+	while (1) {
+		object = kmem_cache_alloc(object_cache, gfp_kmemleak_mask(gfp));
+		if (object)
+			break;
 	}
 
 	INIT_LIST_HEAD(&object->object_list);

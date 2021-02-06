@@ -227,7 +227,7 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 			drm_notifier_call_chain(DRM_EVENT_BLANK, &g_notify_data);
 			dev->fp_quickon = false;
 		}
-		pr_info("%s panel already on\n", __func__);
+		pr_debug("%s panel already on\n", __func__);
 		return;
 	}
 
@@ -277,7 +277,7 @@ static void dsi_bridge_pre_enable(struct drm_bridge *bridge)
 
 	if (c_bridge->display->is_prim_display) {
 		atomic_set(&prim_panel_is_on, true);
-		if ((get_hw_version_platform() == HARDWARE_PLATFORM_DIPPERN)) {
+		if (get_hw_version_platform() == HARDWARE_PLATFORM_DIPPERN) {
 			if (!c_bridge->display->panel->bl_config.ss_panel_id) {
 				rc = panel_disp_param_send(c_bridge->display, 0x40000000);
 				if (!rc)

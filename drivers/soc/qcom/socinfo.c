@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2009-2020, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -69,8 +69,8 @@ enum {
 	HW_PLATFORM_SBC = 24,
 	HW_PLATFORM_ADP = 25,
 	HW_PLATFORM_TTP = 30,
-	HW_PLATFORM_D5X = 40,
 	HW_PLATFORM_HDK = 31,
+	HW_PLATFORM_D5X = 40,
 	HW_PLATFORM_E1N = 50,
 	HW_PLATFORM_E10 = 60,
 	HW_PLATFORM_E1S = 70,
@@ -98,8 +98,8 @@ const char *hw_platform[] = {
 	[HW_PLATFORM_SBC] = "SBC",
 	[HW_PLATFORM_ADP] = "ADP",
 	[HW_PLATFORM_TTP] = "TTP",
-	[HW_PLATFORM_D5X] = "POLARIS",
 	[HW_PLATFORM_HDK] = "HDK",
+	[HW_PLATFORM_D5X] = "POLARIS",
 	[HW_PLATFORM_E1N] = "DIPPER",
 	[HW_PLATFORM_E10] = "BERYLLIUM",
 	[HW_PLATFORM_E1S] = "EQUULEUS",
@@ -2043,7 +2043,7 @@ EXPORT_SYMBOL(get_hw_version_platform);
 uint32_t get_hw_version_major(void)
 {
 	uint32_t version = socinfo_get_platform_version();
-	return ((version & HW_MAJOR_VERSION_MASK) >> HW_MAJOR_VERSION_SHIFT) & 0xF;
+	return (version & HW_MAJOR_VERSION_MASK) >> HW_MAJOR_VERSION_SHIFT;
 }
 EXPORT_SYMBOL(get_hw_version_major);
 

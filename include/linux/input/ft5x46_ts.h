@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2010  Focal tech Ltd.
  * Copyright (c) 2012, Code Aurora Forum. All rights reserved.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -143,12 +144,6 @@ struct ft5x46_data {
 
 	int touchs;
 	int keys;
-	int dbclick_count;
-#ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE_SENSOR
-	bool palm_enabled;
-	bool palm_sensor_changed;
-	struct class *tp_class;
-#endif
 #ifdef CONFIG_DRM
 	struct notifier_block drm_notifier;
 #endif

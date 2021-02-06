@@ -1,5 +1,5 @@
 /* Copyright (c) 2012-2015, 2017, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1728,7 +1728,6 @@ static int qpnp_rgb_set(struct qpnp_led_data *led)
 				return rc;
 			}
 		}
-
 		period_us = led->rgb_cfg->pwm_cfg->pwm_period_us;
 		if (period_us > INT_MAX / NSEC_PER_USEC) {
 			duty_us = (period_us * led->cdev.brightness) /
@@ -1750,7 +1749,6 @@ static int qpnp_rgb_set(struct qpnp_led_data *led)
 				"pwm config failed\n");
 			return rc;
 		}
-
 		rc = qpnp_led_masked_write(led,
 			RGB_LED_EN_CTL(led->base),
 			led->rgb_cfg->enable, led->rgb_cfg->enable);

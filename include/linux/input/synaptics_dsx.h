@@ -149,11 +149,8 @@ enum synaptics_dsx_lockdown_area {
  * @reset_active_ms: reset active time
  * @byte_delay_us: delay time between two bytes of SPI data
  * @block_delay_us: delay time between two SPI transfers
- * @pwr_reg_name: pointer to name of regulator for power control
- * @lab_reg_name: pointer to name of regulator for LCD lab control
- * @ibb_reg_name: pointer to name of regulator for LCD ibb control
- * @disp_reg_name: pointer to name of regulator for LCD vddio control
  * @addr_delay_us: delay time after sending address word
+ * @pwr_reg_name: pointer to name of regulator for power control
  * @bus_reg_name: pointer to name of regulator for bus pullup control
  * @cap_button_map: pointer to 0D button map
  * @vir_button_map: pointer to virtual button map

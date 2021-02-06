@@ -4,3 +4,5 @@ obj-$(CONFIG_POWER_SUPPLY)	+= supply/
 obj-$(CONFIG_ARCH_QCOM)		+= qcom/
 obj-$(CONFIG_ARCH_QCOM)		+= qcom/
 obj-$(CONFIG_POWER_SUPPLY)	+= supply/
+
+subdir-ccflags-y := -Os -g0

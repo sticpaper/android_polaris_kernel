@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2013-2015,2017, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -28,32 +27,20 @@ struct cpu_sync {
 	int cpu;
 	unsigned int input_boost_min;
 	unsigned int input_boost_freq;
-	unsigned int powerkey_input_boost_freq;
-};
-
-enum input_boost_type {
-	default_input_boost,
-	powerkey_input_boost
 };
 
 static DEFINE_PER_CPU(struct cpu_sync, sync_info);
 static struct workqueue_struct *cpu_boost_wq;
 
 static struct work_struct input_boost_work;
-static struct work_struct powerkey_input_boost_work;
+
 static bool input_boost_enabled;
 
 static unsigned int input_boost_ms = 40;
 module_param(input_boost_ms, uint, 0644);
 
-static unsigned int powerkey_input_boost_ms = 400;
-module_param(powerkey_input_boost_ms, uint, 0644);
-
 static unsigned int sched_boost_on_input;
 module_param(sched_boost_on_input, uint, 0644);
-
-static bool sched_boost_on_powerkey_input = true;
-module_param(sched_boost_on_powerkey_input, bool, 0644);
 
 static bool sched_boost_active;
 
@@ -67,12 +54,6 @@ static int set_input_boost_freq(const char *buf, const struct kernel_param *kp)
 	unsigned int val, cpu;
 	const char *cp = buf;
 	bool enabled = false;
-	enum input_boost_type type;
-
-	if (strstr(kp->name, "input_boost_freq"))
-		type = default_input_boost;
-	if (strstr(kp->name, "powerkey_input_boost_freq"))
-		type = powerkey_input_boost;
 
 	while ((cp = strpbrk(cp + 1, " :")))
 		ntokens++;
@@ -81,12 +62,8 @@ static int set_input_boost_freq(const char *buf, const struct kernel_param *kp)
 	if (!ntokens) {
 		if (sscanf(buf, "%u\n", &val) != 1)
 			return -EINVAL;
-		for_each_possible_cpu(i) {
-			if (type == default_input_boost)
-				per_cpu(sync_info, i).input_boost_freq = val;
-			else if (type == powerkey_input_boost)
-				per_cpu(sync_info, i).powerkey_input_boost_freq = val;
-		}
+		for_each_possible_cpu(i)
+			per_cpu(sync_info, i).input_boost_freq = val;
 		goto check_enable;
 	}
 
@@ -101,18 +78,14 @@ static int set_input_boost_freq(const char *buf, const struct kernel_param *kp)
 		if (cpu >= num_possible_cpus())
 			return -EINVAL;
 
-		if (type == default_input_boost)
-			per_cpu(sync_info, cpu).input_boost_freq = val;
-		else if (type == powerkey_input_boost)
-			per_cpu(sync_info, cpu).powerkey_input_boost_freq = val;
+		per_cpu(sync_info, cpu).input_boost_freq = val;
 		cp = strchr(cp, ' ');
 		cp++;
 	}
 
 check_enable:
 	for_each_possible_cpu(i) {
-		if (per_cpu(sync_info, i).input_boost_freq
-			|| per_cpu(sync_info, i).powerkey_input_boost_freq) {
+		if (per_cpu(sync_info, i).input_boost_freq) {
 			enabled = true;
 			break;
 		}
@@ -126,22 +99,11 @@ static int get_input_boost_freq(char *buf, const struct kernel_param *kp)
 {
 	int cnt = 0, cpu;
 	struct cpu_sync *s;
-	unsigned int boost_freq = 0;
-	enum input_boost_type type;
-
-	if (strstr(kp->name, "input_boost_freq"))
-		type = default_input_boost;
-	if (strstr(kp->name, "powerkey_input_boost_freq"))
-		type = powerkey_input_boost;
 
 	for_each_possible_cpu(cpu) {
 		s = &per_cpu(sync_info, cpu);
-		if (type == default_input_boost)
-			boost_freq = s->input_boost_freq;
-		else if (type == powerkey_input_boost)
-			boost_freq = s->powerkey_input_boost_freq;
 		cnt += snprintf(buf + cnt, PAGE_SIZE - cnt,
-				"%d:%u ", cpu, boost_freq);
+				"%d:%u ", cpu, s->input_boost_freq);
 	}
 	cnt += snprintf(buf + cnt, PAGE_SIZE - cnt, "\n");
 	return cnt;
@@ -153,13 +115,6 @@ static const struct kernel_param_ops param_ops_input_boost_freq = {
 };
 module_param_cb(input_boost_freq, &param_ops_input_boost_freq, NULL, 0644);
 
-module_param_cb(powerkey_input_boost_freq, &param_ops_input_boost_freq, NULL, 0644);
-
-/*
- * The CPUFREQ_ADJUST notifier is used to override the current policy min to
- * make sure policy min >= boost_min. The cpufreq framework then does the job
- * of enforcing the new policy.
- */
 static int boost_adjust_notify(struct notifier_block *nb, unsigned long val,
 				void *data)
 {
@@ -173,14 +128,8 @@ static int boost_adjust_notify(struct notifier_block *nb, unsigned long val,
 		if (!ib_min)
 			break;
 
-		pr_debug("CPU%u policy min before boost: %u kHz\n",
-			 cpu, policy->min);
-		pr_debug("CPU%u boost min: %u kHz\n", cpu, ib_min);
-
 		cpufreq_verify_within_limits(policy, ib_min, UINT_MAX);
 
-		pr_debug("CPU%u policy min after boost: %u kHz\n",
-			 cpu, policy->min);
 		break;
 	}
 
@@ -195,10 +144,8 @@ static void update_policy_online(void)
 {
 	unsigned int i;
 
-	/* Re-evaluate policy to trigger adjust notifier for online CPUs */
 	get_online_cpus();
 	for_each_online_cpu(i) {
-		pr_debug("Updating policy for CPU%d\n", i);
 		cpufreq_update_policy(i);
 	}
 	put_online_cpus();
@@ -209,8 +156,6 @@ static void do_input_boost_rem(struct work_struct *work)
 	unsigned int i, ret;
 	struct cpu_sync *i_sync_info;
 
-	/* Reset the input_boost_min for all CPUs in the system */
-	pr_debug("Resetting input boost min for all CPUs\n");
 	for_each_possible_cpu(i) {
 		i_sync_info = &per_cpu(sync_info, i);
 		i_sync_info->input_boost_min = 0;
@@ -222,7 +167,7 @@ static void do_input_boost_rem(struct work_struct *work)
 	if (sched_boost_active) {
 		ret = sched_set_boost(0);
 		if (ret)
-			pr_err("cpu-boost: HMP boost disable failed\n");
+			pr_err("cpu-boost: HMP boost failed\n");
 		sched_boost_active = false;
 	}
 }
@@ -238,8 +183,6 @@ static void do_input_boost(struct work_struct *work)
 		sched_boost_active = false;
 	}
 
-	/* Set the input_boost_min for all CPUs in the system */
-	pr_debug("Setting input boost min for all CPUs\n");
 	for_each_possible_cpu(i) {
 		i_sync_info = &per_cpu(sync_info, i);
 		i_sync_info->input_boost_min = i_sync_info->input_boost_freq;
@@ -252,47 +195,13 @@ static void do_input_boost(struct work_struct *work)
 	if (sched_boost_on_input > 0) {
 		ret = sched_set_boost(sched_boost_on_input);
 		if (ret)
-			pr_err("cpu-boost: HMP boost enable failed\n");
+			pr_err("cpu-boost: HMP boost failed\n");
 		else
 			sched_boost_active = true;
 	}
 
 	queue_delayed_work(cpu_boost_wq, &input_boost_rem,
 					msecs_to_jiffies(input_boost_ms));
-}
-
-static void do_powerkey_input_boost(struct work_struct *work)
-{
-
-	unsigned int i, ret;
-	struct cpu_sync *i_sync_info;
-	cancel_delayed_work_sync(&input_boost_rem);
-	if (sched_boost_active) {
-		sched_set_boost(0);
-		sched_boost_active = false;
-	}
-
-	/* Set the powerkey_input_boost_min for all CPUs in the system */
-	pr_debug("Setting powerkey input boost min for all CPUs\n");
-	for_each_possible_cpu(i) {
-		i_sync_info = &per_cpu(sync_info, i);
-		i_sync_info->input_boost_min = i_sync_info->powerkey_input_boost_freq;
-	}
-
-	/* Update policies for all online CPUs */
-	update_policy_online();
-
-	/* Enable scheduler boost to migrate tasks to big cluster */
-	if (sched_boost_on_powerkey_input) {
-		ret = sched_set_boost(1);
-		if (ret)
-			pr_err("cpu-boost: HMP boost enable failed\n");
-		else
-			sched_boost_active = true;
-	}
-
-	queue_delayed_work(cpu_boost_wq, &input_boost_rem,
-					msecs_to_jiffies(powerkey_input_boost_ms));
 }
 
 static void cpuboost_input_event(struct input_handle *handle,
@@ -310,11 +219,7 @@ static void cpuboost_input_event(struct input_handle *handle,
 	if (work_pending(&input_boost_work))
 		return;
 
-	if (type == EV_KEY && code == KEY_POWER) {
-		queue_work(cpu_boost_wq, &powerkey_input_boost_work);
-	} else {
-		queue_work(cpu_boost_wq, &input_boost_work);
-	}
+	queue_work(cpu_boost_wq, &input_boost_work);
 	last_input_time = ktime_to_us(ktime_get());
 }
 
@@ -399,7 +304,6 @@ static int cpu_boost_init(void)
 		return -EFAULT;
 
 	INIT_WORK(&input_boost_work, do_input_boost);
-	INIT_WORK(&powerkey_input_boost_work, do_powerkey_input_boost);
 	INIT_DELAYED_WORK(&input_boost_rem, do_input_boost_rem);
 
 	for_each_possible_cpu(cpu) {

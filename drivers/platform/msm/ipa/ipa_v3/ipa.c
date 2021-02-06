@@ -1,5 +1,4 @@
 /* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -4176,6 +4175,7 @@ void ipa3_dec_client_disable_clks_no_block(
  */
 void ipa3_inc_acquire_wakelock(void)
 {
+#if 0
 	unsigned long flags;
 
 	spin_lock_irqsave(&ipa3_ctx->wakelock_ref_cnt.spinlock, flags);
@@ -4185,6 +4185,7 @@ void ipa3_inc_acquire_wakelock(void)
 	IPADBG_LOW("active wakelock ref cnt = %d\n",
 		ipa3_ctx->wakelock_ref_cnt.cnt);
 	spin_unlock_irqrestore(&ipa3_ctx->wakelock_ref_cnt.spinlock, flags);
+#endif
 }
 
 /**
@@ -4197,6 +4198,7 @@ void ipa3_inc_acquire_wakelock(void)
  */
 void ipa3_dec_release_wakelock(void)
 {
+#if 0
 	unsigned long flags;
 
 	spin_lock_irqsave(&ipa3_ctx->wakelock_ref_cnt.spinlock, flags);
@@ -4206,6 +4208,7 @@ void ipa3_dec_release_wakelock(void)
 	if (ipa3_ctx->wakelock_ref_cnt.cnt == 0)
 		__pm_relax(&ipa3_ctx->w_lock);
 	spin_unlock_irqrestore(&ipa3_ctx->wakelock_ref_cnt.spinlock, flags);
+#endif
 }
 
 int ipa3_set_clock_plan_from_pm(int idx)
@@ -5101,8 +5104,6 @@ static int ipa3_pil_load_ipa_fws(void)
 	if (IS_ERR_OR_NULL(subsystem_get_retval)) {
 		IPAERR("Unable to trigger PIL process for FW loading\n");
 		return -EINVAL;
-	} else {
-		subsystem_put(subsystem_get_retval);
 	}
 
 	IPADBG("PIL FW loading process is complete\n");
@@ -5386,9 +5387,11 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 		goto fail_mem_ctx;
 	}
 
+#ifdef CONFIG_IPC_LOGGING
 	ipa3_ctx->logbuf = ipc_log_context_create(IPA_IPC_LOG_PAGES, "ipa", 0);
 	if (ipa3_ctx->logbuf == NULL)
 		IPADBG("failed to create IPC log, continue...\n");
+#endif
 
 	/* ipa3_ctx->pdev and ipa3_ctx->uc_pdev will be set in the smmu probes*/
 	ipa3_ctx->master_pdev = ipa_pdev;
@@ -5708,9 +5711,11 @@ static int ipa3_pre_init(const struct ipa3_plat_drv_res *resource_p,
 		goto fail_device_create;
 	}
 
+#if 0
 	/* Create a wakeup source. */
 	wakeup_source_init(&ipa3_ctx->w_lock, "IPA_WS");
 	spin_lock_init(&ipa3_ctx->wakelock_ref_cnt.spinlock);
+#endif
 
 	/* Initialize Power Management framework */
 	if (ipa3_ctx->use_ipa_pm) {
@@ -7123,6 +7128,7 @@ int ipa3_pci_drv_probe(
 	struct ipa_api_controller *api_ctrl,
 	const struct of_device_id *pdrv_match)
 {
+#ifdef CONFIG_PCI
 	int result;
 	struct ipa3_plat_drv_res *ipa_drv_res;
 	u32 bar0_offset;
@@ -7276,6 +7282,9 @@ int ipa3_pci_drv_probe(
 	}
 
 	return result;
+#else
+	return -EOPNOTSUPP;
+#endif
 }
 
 /*

@@ -37,7 +37,7 @@ static u_long videomemorysize = VIDEOMEMSIZE;
 module_param(videomemorysize, ulong, 0);
 MODULE_PARM_DESC(videomemorysize, "RAM available to frame buffer (in bytes)");
 static int bpp = 8;
-module_param(bpp, int, 0644);
+module_param(bpp, int, 0);
 
 static char *mode_option = NULL;
 module_param(mode_option, charp, 0);

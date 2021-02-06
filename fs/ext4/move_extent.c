@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2008,2009 NEC Software Tohoku, Ltd.
- * Copyright (C) 2019 XiaoMi, Inc.
  * Written by Takashi Sato <t-sato@yk.jp.nec.com>
  *            Akira Fujita <a-fujita@rs.jp.nec.com>
  *
@@ -399,8 +398,6 @@ data_copy:
 	if (unlikely(*err < 0))
 		goto repair_branches;
 
-	/* Even in case of data=writeback it is reasonable to pin
-	 * inode to transaction, to prevent unexpected data loss */
 	*err = ext4_jbd2_inode_add_write(handle, orig_inode,
 			(loff_t)orig_page_offset << PAGE_SHIFT, replaced_size);
 
@@ -469,9 +466,6 @@ mext_check_arguments(struct inode *orig_inode,
 
 
 	if (donor_inode->i_mode & (S_ISUID|S_ISGID)) {
-		ext4_debug("ext4 move extent: suid or sgid is set"
-			   " to donor file [ino:orig %lu, donor %lu]\n",
-			   orig_inode->i_ino, donor_inode->i_ino);
 		return -EINVAL;
 	}
 
@@ -480,41 +474,26 @@ mext_check_arguments(struct inode *orig_inode,
 
 	/* Ext4 move extent does not support swapfile */
 	if (IS_SWAPFILE(orig_inode) || IS_SWAPFILE(donor_inode)) {
-		ext4_debug("ext4 move extent: The argument files should "
-			"not be swapfile [ino:orig %lu, donor %lu]\n",
-			orig_inode->i_ino, donor_inode->i_ino);
 		return -EBUSY;
 	}
 
 	if (IS_NOQUOTA(orig_inode) || IS_NOQUOTA(donor_inode)) {
-		ext4_debug("ext4 move extent: The argument files should "
-			"not be quota files [ino:orig %lu, donor %lu]\n",
-			orig_inode->i_ino, donor_inode->i_ino);
 		return -EBUSY;
 	}
 
-	/* Ext4 move extent supports only extent based file */
 	if (!(ext4_test_inode_flag(orig_inode, EXT4_INODE_EXTENTS))) {
-		ext4_debug("ext4 move extent: orig file is not extents "
-			"based file [ino:orig %lu]\n", orig_inode->i_ino);
 		return -EOPNOTSUPP;
 	} else if (!(ext4_test_inode_flag(donor_inode, EXT4_INODE_EXTENTS))) {
-		ext4_debug("ext4 move extent: donor file is not extents "
-			"based file [ino:donor %lu]\n", donor_inode->i_ino);
 		return -EOPNOTSUPP;
 	}
 
 	if ((!orig_inode->i_size) || (!donor_inode->i_size)) {
-		ext4_debug("ext4 move extent: File size is 0 byte\n");
 		return -EINVAL;
 	}
 
 	/* Start offset should be same */
 	if ((orig_start & ~(PAGE_MASK >> orig_inode->i_blkbits)) !=
 	    (donor_start & ~(PAGE_MASK >> orig_inode->i_blkbits))) {
-		ext4_debug("ext4 move extent: orig and donor's start "
-			"offset are not alligned [ino:orig %lu, donor %lu]\n",
-			orig_inode->i_ino, donor_inode->i_ino);
 		return -EINVAL;
 	}
 
@@ -523,9 +502,6 @@ mext_check_arguments(struct inode *orig_inode,
 	    (*len > EXT_MAX_BLOCKS) ||
 	    (donor_start + *len >= EXT_MAX_BLOCKS) ||
 	    (orig_start + *len >= EXT_MAX_BLOCKS))  {
-		ext4_debug("ext4 move extent: Can't handle over [%u] blocks "
-			"[ino:orig %lu, donor %lu]\n", EXT_MAX_BLOCKS,
-			orig_inode->i_ino, donor_inode->i_ino);
 		return -EINVAL;
 	}
 	if (orig_eof <= orig_start)
@@ -537,9 +513,6 @@ mext_check_arguments(struct inode *orig_inode,
 	else if (donor_eof < donor_start + *len - 1)
 		*len = donor_eof - donor_start;
 	if (!*len) {
-		ext4_debug("ext4 move extent: len should not be 0 "
-			"[ino:orig %lu, donor %lu]\n", orig_inode->i_ino,
-			donor_inode->i_ino);
 		return -EINVAL;
 	}
 
@@ -573,25 +546,16 @@ ext4_move_extents(struct file *o_filp, struct file *d_filp, __u64 orig_blk,
 	int ret;
 
 	if (orig_inode->i_sb != donor_inode->i_sb) {
-		ext4_debug("ext4 move extent: The argument files "
-			"should be in same FS [ino:orig %lu, donor %lu]\n",
-			orig_inode->i_ino, donor_inode->i_ino);
 		return -EINVAL;
 	}
 
 	/* orig and donor should be different inodes */
 	if (orig_inode == donor_inode) {
-		ext4_debug("ext4 move extent: The argument files should not "
-			"be same inode [ino:orig %lu, donor %lu]\n",
-			orig_inode->i_ino, donor_inode->i_ino);
 		return -EINVAL;
 	}
 
 	/* Regular file check */
 	if (!S_ISREG(orig_inode->i_mode) || !S_ISREG(donor_inode->i_mode)) {
-		ext4_debug("ext4 move extent: The argument files should be "
-			"regular file [ino:orig %lu, donor %lu]\n",
-			orig_inode->i_ino, donor_inode->i_ino);
 		return -EINVAL;
 	}
 

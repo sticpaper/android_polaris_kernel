@@ -7,27 +7,7 @@
  * /sys/module/lowmemorykiller/parameters/minfree. Both files take a comma
  * separated list of numbers in ascending order.
  *
- * For example, write "0,8" to /sys/module/lowmemorykiller/parameters/adj and
- * "1024,4096" to /sys/module/lowmemorykiller/parameters/minfree to kill
- * processes with a oom_score_adj value of 8 or higher when the free memory
- * drops below 4096 pages and kill processes with a oom_score_adj value of 0 or
- * higher when the free memory drops below 1024 pages.
- *
- * The driver considers memory used for caches to be free, but if a large
- * percentage of the cached memory is locked this can be very inaccurate
- * and processes may not get killed until the normal oom killer is triggered.
- *
  * Copyright (C) 2007-2008 Google, Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
  *
  */
 
@@ -72,7 +52,7 @@
 static int enable_lmk = 1;
 module_param_named(enable_lmk, enable_lmk, int, 0644);
 
-static u32 lowmem_debug_level = 1;
+static u32 lowmem_debug_level = 0;
 static short lowmem_adj[6] = {
 	0,
 	1,
@@ -183,12 +163,6 @@ static int lmk_event_show(struct seq_file *s, void *unused)
 
 	event = &events[tail];
 
-	seq_printf(s, "%lu %lu %lu %lu %lu %lu %hd %hd %llu\n%s\n",
-		(unsigned long) event->pid, (unsigned long) event->uid,
-		(unsigned long) event->group_leader_pid, event->min_flt,
-		event->maj_flt, event->rss_in_pages, event->oom_score_adj,
-		event->min_score_adj, event->start_time, event->taskname);
-
 	event_buffer.tail = (tail + 1) & (MAX_BUFFERED_EVENTS - 1);
 
 	spin_unlock(&lmk_event_lock);
@@ -251,7 +225,7 @@ module_param_named(adj_max_shift, adj_max_shift, short, 0644);
 
 /* User knob to enable/disable adaptive lmk feature */
 static int enable_adaptive_lmk;
-module_param_named(enable_adaptive_lmk, enable_adaptive_lmk, int, 0644);
+module_param_named(enable_adaptive_lmk, enable_adaptive_lmk, int, 0444);
 
 /*
  * This parameter controls the behaviour of LMK when vmpressure is in
@@ -568,8 +542,6 @@ void tune_lmk_param(int *other_free, int *other_file, struct shrink_control *sc)
 			  zone_page_state(preferred_zone, NR_FREE_CMA_PAGES);
 		}
 
-		lowmem_print(4, "lowmem_shrink tunning for others ofree %d, "
-			     "%d\n", *other_free, *other_file);
 	}
 }
 
@@ -630,16 +602,10 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 
 	ret = adjust_minadj(&min_score_adj);
 
-	lowmem_print(3, "lowmem_scan %lu, %x, ofree %d %d, ma %hd\n",
-		     sc->nr_to_scan, sc->gfp_mask, other_free,
-		     other_file, min_score_adj);
-
 	if (min_score_adj == OOM_SCORE_ADJ_MAX + 1) {
 		trace_almk_shrink(0, ret, other_free, other_file, 0);
-		lowmem_print(5, "lowmem_scan %lu, %x, return 0\n",
-			     sc->nr_to_scan, sc->gfp_mask);
 		mutex_unlock(&scan_mutex);
-		return SHRINK_STOP;
+		return 0;
 	}
 
 	selected_oom_score_adj = min_score_adj;
@@ -706,8 +672,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		selected = p;
 		selected_tasksize = tasksize;
 		selected_oom_score_adj = oom_score_adj;
-		lowmem_print(3, "select '%s' (%d), adj %hd, size %d, to kill\n",
-			     p->comm, p->pid, oom_score_adj, tasksize);
 	}
 	if (selected) {
 		long cache_size = other_file * (long)(PAGE_SIZE / 1024);
@@ -716,9 +680,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 
 		if (test_task_lmk_waiting(selected) &&
 		    (test_task_state(selected, TASK_UNINTERRUPTIBLE))) {
-			lowmem_print(2, "'%s' (%d) is already killed\n",
-				     selected->comm,
-				     selected->pid);
 			rcu_read_unlock();
 			mutex_unlock(&scan_mutex);
 			return 0;
@@ -737,30 +698,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		}
 		task_unlock(selected);
 		trace_lowmemory_kill(selected, cache_size, cache_limit, free);
-		lowmem_print(1, "Killing '%s' (%d) (tgid %d), adj %hd,\n"
-			"to free %ldkB on behalf of '%s' (%d) because\n"
-			"cache %ldkB is below limit %ldkB for oom score %hd\n"
-			"Free memory is %ldkB above reserved.\n"
-			"Free CMA is %ldkB\n"
-			"Total reserve is %ldkB\n"
-			"Total free pages is %ldkB\n"
-			"Total file cache is %ldkB\n"
-			"GFP mask is 0x%x\n",
-			selected->comm, selected->pid, selected->tgid,
-			selected_oom_score_adj,
-			selected_tasksize * (long)(PAGE_SIZE / 1024),
-			current->comm, current->pid,
-			cache_size, cache_limit,
-			min_score_adj,
-			free,
-			global_page_state(NR_FREE_CMA_PAGES) *
-			(long)(PAGE_SIZE / 1024),
-			totalreserve_pages * (long)(PAGE_SIZE / 1024),
-			global_page_state(NR_FREE_PAGES) *
-			(long)(PAGE_SIZE / 1024),
-			global_node_page_state(NR_FILE_PAGES) *
-			(long)(PAGE_SIZE / 1024),
-			sc->gfp_mask);
 
 		if (lowmem_debug_level >= 2 && selected_oom_score_adj == 0) {
 			show_mem(SHOW_MEM_FILTER_NODES);
@@ -784,8 +721,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		rcu_read_unlock();
 	}
 
-	lowmem_print(4, "lowmem_scan %lu, %x, return %lu\n",
-		     sc->nr_to_scan, sc->gfp_mask, rem);
 	mutex_unlock(&scan_mutex);
 
 	if (selected) {
@@ -793,10 +728,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		put_task_struct(selected);
 	}
 
-	if (rem == 0)
-		return SHRINK_STOP;
-	else
-		return rem;
+	return rem;
 }
 
 static struct shrinker lowmem_shrinker = {
@@ -844,13 +776,10 @@ static void lowmem_autodetect_oom_adj_values(void)
 	if (oom_score_adj <= OOM_ADJUST_MAX)
 		return;
 
-	lowmem_print(1, "lowmem_shrink: convert oom_adj to oom_score_adj:\n");
 	for (i = 0; i < array_size; i++) {
 		oom_adj = lowmem_adj[i];
 		oom_score_adj = lowmem_oom_adj_to_oom_score_adj(oom_adj);
 		lowmem_adj[i] = oom_score_adj;
-		lowmem_print(1, "oom_adj %d => oom_score_adj %d\n",
-			     oom_adj, oom_score_adj);
 	}
 }
 
@@ -906,6 +835,5 @@ module_param_array_named(adj, lowmem_adj, short, &lowmem_adj_size, 0644);
 #endif
 module_param_array_named(minfree, lowmem_minfree, uint, &lowmem_minfree_size,
 			 S_IRUGO | S_IWUSR);
-module_param_named(debug_level, lowmem_debug_level, uint, S_IRUGO | S_IWUSR);
+module_param_named(debug_level, lowmem_debug_level, uint, 0);
 module_param_named(lmk_fast_run, lmk_fast_run, int, S_IRUGO | S_IWUSR);
-

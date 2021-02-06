@@ -37,7 +37,7 @@
 #include "internal.h"
 
 static bool notests;
-module_param(notests, bool, 0644);
+module_param(notests, bool, 0);
 MODULE_PARM_DESC(notests, "disable crypto self-tests");
 
 #ifdef CONFIG_CRYPTO_MANAGER_DISABLE_TESTS

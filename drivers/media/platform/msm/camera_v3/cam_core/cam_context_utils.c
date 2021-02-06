@@ -27,7 +27,7 @@
 #include "cam_debug_util.h"
 
 static uint cam_debug_ctx_req_list;
-module_param(cam_debug_ctx_req_list, uint, 0644);
+module_param(cam_debug_ctx_req_list, uint, 0);
 
 static inline int cam_context_validate_thread(void)
 {

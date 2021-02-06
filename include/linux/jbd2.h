@@ -4,7 +4,6 @@
  * Written by Stephen C. Tweedie <sct@redhat.com>
  *
  * Copyright 1998-2000 Red Hat, Inc --- All Rights Reserved
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This file is part of the Linux kernel and is made available under
  * the terms of the GNU General Public License, version 2, or at your
@@ -48,7 +47,7 @@
 /*
  * The default maximum commit age, in seconds.
  */
-#define JBD2_DEFAULT_MAX_COMMIT_AGE 5
+#define JBD2_DEFAULT_MAX_COMMIT_AGE 60
 
 #ifdef CONFIG_JBD2_DEBUG
 /*
@@ -760,10 +759,6 @@ struct transaction_run_stats_s {
 	unsigned long		rs_locked;
 	unsigned long		rs_flushing;
 	unsigned long		rs_logging;
-	unsigned long		rs_data_flushed;
-	unsigned long		rs_metadata_flushed;
-	unsigned long		rs_committing;
-	unsigned long		rs_callback;
 
 	__u32			rs_handle_count;
 	__u32			rs_blocks;
@@ -1526,6 +1521,7 @@ int __jbd2_log_start_commit(journal_t *journal, tid_t tid);
 int jbd2_journal_start_commit(journal_t *journal, tid_t *tid);
 int jbd2_log_wait_commit(journal_t *journal, tid_t tid);
 int jbd2_complete_transaction(journal_t *journal, tid_t tid);
+int jbd2_transaction_need_wait(journal_t *journal, tid_t tid);
 int jbd2_log_do_checkpoint(journal_t *journal);
 int jbd2_trans_will_send_data_barrier(journal_t *journal, tid_t tid);
 

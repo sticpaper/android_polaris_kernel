@@ -11,7 +11,8 @@ clk-qcom-y += clk-regmap-divider.o
 clk-qcom-y += clk-regmap-mux.o
 clk-qcom-y += clk-regmap-mux-div.o
 clk-qcom-y += reset.o clk-voter.o
-clk-qcom-y += clk-dummy.o clk-debug.o
+clk-qcom-y += clk-dummy.o
+clk-qcom-$(CONFIG_DEBUG_FS) += clk-debug.o
 clk-qcom-$(CONFIG_QCOM_GDSC) += gdsc.o gdsc-regulator.o
 
 # Keep alphabetically sorted by config
@@ -36,7 +37,7 @@ obj-$(CONFIG_MSM_GCC_8916) += gcc-msm8916.o
 obj-$(CONFIG_MSM_GCC_8960) += gcc-msm8960.o
 obj-$(CONFIG_MSM_GCC_8974) += gcc-msm8974.o
 obj-$(CONFIG_MSM_GCC_8996) += gcc-msm8996.o
-obj-$(CONFIG_MSM_GCC_SDM845) += gcc-sdm845.o debugcc-sdm845.o
+obj-$(CONFIG_MSM_GCC_SDM845) += gcc-sdm845.o
 obj-$(CONFIG_MSM_GPUCC_SDM845) += gpucc-sdm845.o
 obj-$(CONFIG_MSM_LCC_8960) += lcc-msm8960.o
 obj-$(CONFIG_MSM_MMCC_8960) += mmcc-msm8960.o

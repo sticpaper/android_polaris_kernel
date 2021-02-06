@@ -142,10 +142,10 @@ struct generic_get_data_ {
 };
 static struct generic_get_data_ *generic_get_data;
 
-#ifdef CONFIG_DEBUG_FS
 #define OUT_BUFFER_SIZE 56
 #define IN_BUFFER_SIZE 24
 
+#ifdef CONFIG_DEBUG_FS
 static struct timeval out_cold_tv;
 static struct timeval out_warm_tv;
 static struct timeval out_cont_tv;
@@ -159,6 +159,7 @@ static int in_cont_index;
 static int out_cold_index;
 static char *out_buffer;
 static char *in_buffer;
+#endif
 
 static uint32_t adsp_reg_event_opcode[] = {
 	ASM_STREAM_CMD_REGISTER_PP_EVENTS,
@@ -271,6 +272,7 @@ uint8_t q6asm_get_stream_id_from_token(uint32_t token)
 }
 EXPORT_SYMBOL(q6asm_get_stream_id_from_token);
 
+#ifdef CONFIG_DEBUG_FS
 static int audio_output_latency_dbgfs_open(struct inode *inode,
 							struct file *file)
 {
@@ -1955,9 +1957,6 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 						flags);
 					return 0;
 				}
-			} else {
-				pr_err("%s: payload size of %x is less than expected.\n",
-					__func__, data->payload_size);
 			}
 			if ((is_adsp_reg_event(payload[0]) >= 0) ||
 			    (payload[0] == ASM_STREAM_CMD_SET_PP_PARAMS_V2)) {
@@ -1996,9 +1995,6 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 						flags);
 					return 0;
 				}
-			} else {
-				pr_err("%s: payload size of %x is less than expected.\n",
-					__func__, data->payload_size);
 			}
 			if (atomic_read(&ac->mem_state) && wakeup_flag) {
 				atomic_set(&ac->mem_state, 0);
@@ -2034,9 +2030,6 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 							ac->session, payload,
 							data->payload_size);
 				}
-			} else {
-				pr_err("%s: payload size of %x is less than expected.\n",
-					__func__, data->payload_size);
 			}
 			break;
 		case ASM_STREAM_CMD_REGISTER_PP_EVENTS:
@@ -2050,9 +2043,6 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 						__func__, payload[1]);
 				atomic_set(&ac->cmd_state_pp, payload[1]);
 				wake_up(&ac->cmd_wait);
-			} else {
-				pr_err("%s: payload size of %x is less than expected.\n",
-					__func__, data->payload_size);
 			}
 			break;
 		default:
@@ -2158,13 +2148,7 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 								__func__, i,
 								payload[4+i]);
 					}
-				} else {
-					pr_err("%s: payload size of %x is less than expected.\n",
-						__func__, data->payload_size);
 				}
-				pr_debug("%s: callback size in ints = %i\n",
-					 __func__,
-					generic_get_data->size_in_ints);
 			}
 			if (atomic_read(&ac->cmd_state) && wakeup_flag) {
 				atomic_set(&ac->cmd_state, 0);

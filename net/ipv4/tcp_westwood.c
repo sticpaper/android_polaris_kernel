@@ -301,6 +301,6 @@ static void __exit tcp_westwood_unregister(void)
 module_init(tcp_westwood_register);
 module_exit(tcp_westwood_unregister);
 
-MODULE_AUTHOR("Stephen Hemminger, Angelo Dell'Aera");
+MODULE_AUTHOR("Stephen");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("TCP Westwood+");

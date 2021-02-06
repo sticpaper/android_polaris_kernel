@@ -97,6 +97,7 @@ struct clk_osm {
 	u32 prev_cycle_counter;
 	u32 max_core_count;
 	u32 mx_turbo_freq;
+	cpumask_t related_cpus;
 };
 
 static bool is_sdm845v1;
@@ -116,14 +117,9 @@ static inline int clk_osm_read_reg(struct clk_osm *c, u32 offset)
 	return readl_relaxed(c->vbase + offset);
 }
 
-static inline int clk_osm_read_reg_no_log(struct clk_osm *c, u32 offset)
-{
-	return readl_relaxed_no_log(c->vbase + offset);
-}
-
 static inline int clk_osm_mb(struct clk_osm *c)
 {
-	return readl_relaxed_no_log(c->vbase + ENABLE_REG);
+	return readl_relaxed(c->vbase + ENABLE_REG);
 }
 
 static long clk_osm_list_rate(struct clk_hw *hw, unsigned int n,
@@ -377,21 +373,27 @@ static const struct clk_ops clk_ops_l3_osm = {
 	.list_rate = clk_osm_list_rate,
 	.recalc_rate = l3_clk_recalc_rate,
 	.set_rate = l3_clk_set_rate,
+#ifdef CONFIG_DEBUG_FS
 	.debug_init = clk_debug_measure_add,
+#endif
 };
 
 static const struct clk_ops clk_ops_pwrcl_core = {
 	.set_rate = clk_pwrcl_set_rate,
 	.determine_rate = clk_cpu_determine_rate,
 	.recalc_rate = clk_cpu_recalc_rate,
+#ifdef CONFIG_DEBUG_FS
 	.debug_init = clk_debug_measure_add,
+#endif
 };
 
 static const struct clk_ops clk_ops_perfcl_core = {
 	.set_rate = clk_cpu_set_rate,
 	.determine_rate = clk_cpu_determine_rate,
 	.recalc_rate = clk_cpu_recalc_rate,
+#ifdef CONFIG_DEBUG_FS
 	.debug_init = clk_debug_measure_add,
+#endif
 };
 
 static const struct clk_ops clk_ops_cpu_osm = {
@@ -399,7 +401,9 @@ static const struct clk_ops clk_ops_cpu_osm = {
 	.recalc_rate = clk_osm_recalc_rate,
 	.list_rate = clk_osm_list_rate,
 	.determine_rate = clk_osm_determine_rate,
+#ifdef CONFIG_DEBUG_FS
 	.debug_init = clk_debug_measure_add,
+#endif
 };
 
 static struct clk_init_data osm_clks_init[] = {
@@ -407,7 +411,7 @@ static struct clk_init_data osm_clks_init[] = {
 		.name = "l3_clk",
 		.parent_names = (const char *[]){ "bi_tcxo_ao" },
 		.num_parents = 1,
-		.flags = CLK_CHILD_NO_RATE_PROP,
+		.flags = CLK_CHILD_NO_RATE_PROP | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_l3_osm,
 		.vdd_class = &vdd_l3_mx_ao,
 	},
@@ -415,6 +419,7 @@ static struct clk_init_data osm_clks_init[] = {
 		.name = "pwrcl_clk",
 		.parent_names = (const char *[]){ "bi_tcxo_ao" },
 		.num_parents = 1,
+		.flags = CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_cpu_osm,
 		.vdd_class = &vdd_pwrcl_mx_ao,
 	},
@@ -422,6 +427,7 @@ static struct clk_init_data osm_clks_init[] = {
 		.name = "perfcl_clk",
 		.parent_names = (const char *[]){ "bi_tcxo_ao" },
 		.num_parents = 1,
+		.flags = CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_cpu_osm,
 	},
 };
@@ -432,10 +438,10 @@ static struct clk_osm l3_clk = {
 	.hw.init = &osm_clks_init[0],
 };
 
-static DEFINE_CLK_VOTER(l3_cluster0_vote_clk, l3_clk, 0);
-static DEFINE_CLK_VOTER(l3_cluster1_vote_clk, l3_clk, 0);
-static DEFINE_CLK_VOTER(l3_misc_vote_clk, l3_clk, 0);
-static DEFINE_CLK_VOTER(l3_gpu_vote_clk, l3_clk, 0);
+static DEFINE_CLK_VOTER_NOCACHE(l3_cluster0_vote_clk, l3_clk, 0);
+static DEFINE_CLK_VOTER_NOCACHE(l3_cluster1_vote_clk, l3_clk, 0);
+static DEFINE_CLK_VOTER_NOCACHE(l3_misc_vote_clk, l3_clk, 0);
+static DEFINE_CLK_VOTER_NOCACHE(l3_gpu_vote_clk, l3_clk, 0);
 
 static struct clk_osm pwrcl_clk = {
 	.cluster_num = 1,
@@ -451,7 +457,7 @@ static struct clk_osm cpu0_pwrcl_clk = {
 		.name = "cpu0_pwrcl_clk",
 		.parent_names = (const char *[]){ "pwrcl_clk" },
 		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_pwrcl_core,
 	},
 };
@@ -464,7 +470,7 @@ static struct clk_osm cpu1_pwrcl_clk = {
 		.name = "cpu1_pwrcl_clk",
 		.parent_names = (const char *[]){ "pwrcl_clk" },
 		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_pwrcl_core,
 	},
 };
@@ -477,7 +483,7 @@ static struct clk_osm cpu2_pwrcl_clk = {
 		.name = "cpu2_pwrcl_clk",
 		.parent_names = (const char *[]){ "pwrcl_clk" },
 		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_pwrcl_core,
 	},
 };
@@ -490,7 +496,7 @@ static struct clk_osm cpu3_pwrcl_clk = {
 		.name = "cpu3_pwrcl_clk",
 		.parent_names = (const char *[]){ "pwrcl_clk" },
 		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_pwrcl_core,
 	},
 };
@@ -503,7 +509,7 @@ static struct clk_osm cpu4_pwrcl_clk = {
 		.name = "cpu4_pwrcl_clk",
 		.parent_names = (const char *[]){ "pwrcl_clk" },
 		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_pwrcl_core,
 	},
 };
@@ -516,7 +522,7 @@ static struct clk_osm cpu5_pwrcl_clk = {
 		.name = "cpu5_pwrcl_clk",
 		.parent_names = (const char *[]){ "pwrcl_clk" },
 		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_pwrcl_core,
 	},
 };
@@ -536,7 +542,7 @@ static struct clk_osm cpu4_perfcl_clk = {
 		.name = "cpu4_perfcl_clk",
 		.parent_names = (const char *[]){ "perfcl_clk" },
 		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_perfcl_core,
 	},
 };
@@ -549,7 +555,7 @@ static struct clk_osm cpu5_perfcl_clk = {
 		.name = "cpu5_perfcl_clk",
 		.parent_names = (const char *[]){ "perfcl_clk" },
 		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_perfcl_core,
 	},
 };
@@ -562,7 +568,7 @@ static struct clk_osm cpu6_perfcl_clk = {
 		.name = "cpu6_perfcl_clk",
 		.parent_names = (const char *[]){ "perfcl_clk" },
 		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_perfcl_core,
 	},
 };
@@ -575,7 +581,7 @@ static struct clk_osm cpu7_perfcl_clk = {
 		.name = "cpu7_perfcl_clk",
 		.parent_names = (const char *[]){ "perfcl_clk" },
 		.num_parents = 1,
-		.flags = CLK_SET_RATE_PARENT,
+		.flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
 		.ops = &clk_ops_perfcl_core,
 	},
 };
@@ -681,7 +687,7 @@ static struct clk_osm *osm_configure_policy(struct cpufreq_policy *policy)
 		if (parent != c_parent)
 			continue;
 
-		cpumask_set_cpu(cpu, policy->cpus);
+		cpumask_set_cpu(cpu, &c->related_cpus);
 		if (n->core_num == 0)
 			first = n;
 	}
@@ -715,6 +721,9 @@ osm_cpufreq_target_index(struct cpufreq_policy *policy, unsigned int index)
 	struct clk_osm *c = policy->driver_data;
 
 	osm_set_index(c, index);
+	scale_freq_capacity(policy->related_cpus,
+			    policy->freq_table[index].frequency,
+			    policy->cpuinfo.max_freq);
 	return 0;
 }
 
@@ -812,6 +821,9 @@ static int osm_cpufreq_cpu_init(struct cpufreq_policy *policy)
 	}
 
 	policy->driver_data = c;
+
+	cpumask_copy(policy->cpus, &c->related_cpus);
+
 	return 0;
 
 err:
@@ -1018,7 +1030,7 @@ static u64 clk_osm_get_cpu_cycle_counter(int cpu)
 	 * core DCVS is disabled.
 	 */
 	core_num = parent->per_core_dcvs ? c->core_num : 0;
-	val = clk_osm_read_reg_no_log(parent,
+	val = clk_osm_read_reg(parent,
 			OSM_CYCLE_COUNTER_STATUS_REG(core_num, is_sdm845v1));
 
 	if (val < c->prev_cycle_counter) {

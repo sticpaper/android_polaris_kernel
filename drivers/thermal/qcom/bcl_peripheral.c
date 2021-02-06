@@ -515,13 +515,10 @@ static int bcl_read_soc(void *data, int *val)
 		err = power_supply_get_property(batt_psy,
 				POWER_SUPPLY_PROP_CAPACITY, &ret);
 		if (err) {
-			pr_err("battery percentage read error:%d\n",
-				err);
 			return err;
 		}
 		*val = ret.intval;
 	}
-	pr_debug("soc:%d\n", *val);
 
 	return err;
 }

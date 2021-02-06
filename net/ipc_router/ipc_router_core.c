@@ -47,15 +47,12 @@ enum {
 
 static int msm_ipc_router_debug_mask;
 module_param_named(debug_mask, msm_ipc_router_debug_mask,
-		   int, 0664);
+		   int, 0);
 #define MODULE_NAME "ipc_router"
 
 #define IPC_RTR_INFO_PAGES 6
 
 #define IPC_RTR_INFO(log_ctx, x...) do { \
-typeof(log_ctx) _log_ctx = (log_ctx); \
-if (_log_ctx) \
-	ipc_log_string(_log_ctx, x); \
 if (msm_ipc_router_debug_mask & RTR_DBG) \
 	pr_info("[IPCRTR] "x); \
 } while (0)
@@ -3990,6 +3987,7 @@ static void debugfs_init(void)
 static void debugfs_init(void) {}
 #endif
 
+#ifdef CONFIG_IPC_LOGGING
 /**
  * ipc_router_create_log_ctx() - Create and add the log context based on
  *				 transport
@@ -4021,6 +4019,12 @@ static void *ipc_router_create_log_ctx(char *name)
 	list_add_tail(&sub_log_ctx->list, &log_ctx_list);
 	return sub_log_ctx->log_ctx;
 }
+#else
+static void *ipc_router_create_log_ctx(char *name)
+{
+	return NULL;
+}
+#endif
 
 static void ipc_router_log_ctx_init(void)
 {

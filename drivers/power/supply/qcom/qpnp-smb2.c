@@ -191,9 +191,9 @@ struct smb2 {
 	bool			bad_part;
 };
 
-static int __debug_mask = PR_OEM | PR_MISC;
+static int __debug_mask;
 module_param_named(
-	debug_mask, __debug_mask, int, 0600
+	debug_mask, __debug_mask, int, 0
 );
 
 static int __weak_chg_icl_ua = 500000;
@@ -213,8 +213,8 @@ module_param_named(
 #define MICRO_1P5A		1500000
 #define MICRO_P1A		100000
 #define OTG_DEFAULT_DEGLITCH_TIME_MS	50
-#define MAX_DCP_ICL_UA  1800000
-#define DEFAULT_CRITICAL_JEITA_CCOMP 2975000
+#define MAX_DCP_ICL_UA  		1800000
+#define DEFAULT_CRITICAL_JEITA_CCOMP 	2975000
 #define JEITA_SOFT_HOT_CC_COMP		1600000
 #define JEITA_SOFT_COOL_CC_COMP		2225000
 #define MIN_WD_BARK_TIME		16
@@ -462,7 +462,8 @@ static int smb2_parse_dt(struct smb2 *chip)
 					&chg->otg_delay_ms);
 	if (rc < 0)
 		chg->otg_delay_ms = OTG_DEFAULT_DEGLITCH_TIME_MS;
-		rc = of_property_read_u32(node, "qcom,fcc-low-temp-delta",
+
+	rc = of_property_read_u32(node, "qcom,fcc-low-temp-delta",
 				&chip->dt.jeita_low_cc_delta);
 	if (rc < 0)
 		chip->dt.jeita_low_cc_delta = DEFAULT_CRITICAL_JEITA_CCOMP;
@@ -479,7 +480,6 @@ static int smb2_parse_dt(struct smb2 *chip)
 	if (rc < 0)
 		chip->dt.jeita_cool_cc_delta = JEITA_SOFT_COOL_CC_COMP;
 	chg->jeita_ccomp_cool_delta = chip->dt.jeita_cool_cc_delta;
-
 
 	chg->disable_stat_sw_override = of_property_read_bool(node,
 					"qcom,disable-stat-sw-override");
@@ -546,7 +546,7 @@ static int smb2_usb_get_prop(struct power_supply *psy,
 			rc = smblib_get_prop_usb_present(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
-		if (chg->report_usb_absent){
+		if (chg->report_usb_absent) {
 			val->intval = 0;
 			break;
 		}
@@ -823,7 +823,7 @@ static int smb2_usb_port_get_prop(struct power_supply *psy,
 		val->intval = POWER_SUPPLY_TYPE_USB;
 		break;
 	case POWER_SUPPLY_PROP_ONLINE:
-		if (chg->report_usb_absent){
+		if (chg->report_usb_absent) {
 			val->intval = 0;
 			break;
 		}
@@ -1076,7 +1076,6 @@ static int smb2_dc_get_prop(struct power_supply *psy,
 		rc = smblib_get_prop_dc_online(chg, val);
 		break;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_NOW:
-		//rc = smblib_get_prop_dc_current_now(chg, val);
 		val->intval = chg->dc_input_current_now;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
@@ -1318,8 +1317,6 @@ static int smb2_init_wireless_psy(struct smb2 *chip)
 
 	return 0;
 }
-
-
 
 /*************************
  * BATT PSY REGISTRATION *
@@ -2069,16 +2066,6 @@ static int smb2_init_hw(struct smb2 *chip)
 			"Couldn't configure QC3.0 to 6.6V rc=%d\n", rc);
 		return rc;
 	}
-/*
-	rc = smblib_masked_write(chg, USBIN_ADAPTER_ALLOW_CFG_REG,
-				 USBIN_ADAPTER_ALLOW_MASK,
-				 USBIN_ADAPTER_ALLOW_5V_TO_9V);
-	if (rc < 0) {
-		dev_err(chg->dev,
-			"Couldn't configure QC to 9V rc=%d\n", rc);
-		return rc;
-	}
-*/
 
 	/*
 	 * AICL configuration:
@@ -3091,6 +3078,7 @@ static void smb2_shutdown(struct platform_device *pdev)
 	smblib_masked_write(chg, USBIN_OPTIONS_1_CFG_REG,
 				 AUTO_SRC_DETECT_BIT, AUTO_SRC_DETECT_BIT);
 }
+
 #ifdef CONFIG_FB
 static int smblib_suspend(struct device *dev)
 {
@@ -3120,6 +3108,7 @@ static const struct dev_pm_ops smb2_pm_ops = {
 	.resume		= smblib_resume,
 };
 #endif
+
 static const struct of_device_id match_table[] = {
 	{ .compatible = "qcom,qpnp-smb2", },
 	{ },
@@ -3137,7 +3126,6 @@ static struct platform_driver smb2_driver = {
 	.probe		= smb2_probe,
 	.remove		= smb2_remove,
 	.shutdown	= smb2_shutdown,
-
 };
 module_platform_driver(smb2_driver);
 

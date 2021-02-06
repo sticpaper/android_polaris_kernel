@@ -266,13 +266,6 @@ asmlinkage notrace void secondary_start_kernel(void)
 
 	store_cpu_topology(cpu);
 
-	/*
-	 * OK, now it's safe to let the boot CPU continue.  Wait for
-	 * the CPU migration code to notice that the CPU is online
-	 * before we continue.
-	 */
-	pr_info("CPU%u: Booted secondary processor [%08x]\n",
-					 cpu, read_cpuid_id());
 	update_cpu_boot_status(CPU_BOOT_SUCCESS);
 	set_cpu_online(cpu, true);
 	complete(&cpu_running);
@@ -862,8 +855,7 @@ static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
 	flush_cache_all();
 	local_irq_disable();
 
-	while (1)
-		cpu_relax();
+	cpu_park_loop();
 }
 
 static cpumask_t backtrace_mask;
@@ -1025,13 +1017,6 @@ static inline unsigned int num_other_online_cpus(void)
 	return num_online_cpus() - this_cpu_online;
 }
 
-static inline unsigned int num_other_active_cpus(void)
-{
-	unsigned int this_cpu_active = cpu_active(smp_processor_id());
-
-	return num_active_cpus() - this_cpu_active;
-}
-
 void smp_send_stop(void)
 {
 	unsigned long timeout;
@@ -1050,11 +1035,10 @@ void smp_send_stop(void)
 
 	/* Wait up to one second for other CPUs to stop */
 	timeout = USEC_PER_SEC;
-
-	while (num_other_active_cpus() && timeout--)
+	while (num_other_online_cpus() && timeout--)
 		udelay(1);
 
-	if (num_other_active_cpus())
+	if (num_other_online_cpus())
 		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
 			   cpumask_pr_args(cpu_online_mask));
 }

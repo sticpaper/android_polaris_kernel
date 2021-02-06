@@ -320,9 +320,9 @@ struct channel_ctx {
 
 static struct glink_core_if core_impl;
 static void *log_ctx;
-static unsigned int glink_debug_mask = QCOM_GLINK_INFO;
+static unsigned int glink_debug_mask;
 module_param_named(debug_mask, glink_debug_mask,
-		   uint, S_IRUGO | S_IWUSR | S_IWGRP);
+		   uint, 0);
 
 static unsigned int glink_pm_qos;
 module_param_named(pm_qos_enable, glink_pm_qos,
@@ -4065,7 +4065,9 @@ int glink_core_register_transport(struct glink_transport_if *if_ptr,
 	size_t len;
 	uint16_t id;
 	int ret;
+#ifdef CONFIG_IPC_LOGGING
 	char log_name[GLINK_NAME_SIZE*2+2] = {0};
+#endif
 
 	if (!if_ptr || !cfg || !cfg->name || !cfg->edge)
 		return -EINVAL;
@@ -4166,12 +4168,14 @@ int glink_core_register_transport(struct glink_transport_if *if_ptr,
 	list_add_tail(&xprt_ptr->list_node, &transport_list);
 	mutex_unlock(&transport_list_lock_lha0);
 	glink_debugfs_add_xprt(xprt_ptr);
+#ifdef CONFIG_IPC_LOGGING
 	snprintf(log_name, sizeof(log_name), "%s_%s",
 			xprt_ptr->edge, xprt_ptr->name);
 	xprt_ptr->log_ctx = ipc_log_context_create(NUM_LOG_PAGES, log_name, 0);
 	if (!xprt_ptr->log_ctx)
 		GLINK_ERR("%s: unable to create log context for [%s:%s]\n",
 				__func__, xprt_ptr->edge, xprt_ptr->name);
+#endif
 
 	return 0;
 }
@@ -5832,7 +5836,7 @@ static void glink_pm_qos_unvote(struct glink_core_xprt_ctx *xprt_ptr)
 	xprt_ptr->tx_path_activity = false;
 	if (xprt_ptr->qos_req_active) {
 		GLINK_PERF("%s: qos unvote\n", __func__);
-		schedule_delayed_work(&xprt_ptr->pm_qos_work,
+		queue_delayed_work(system_power_efficient_wq, &xprt_ptr->pm_qos_work,
 				msecs_to_jiffies(GLINK_PM_QOS_HOLDOFF_MS));
 	}
 }
@@ -6362,9 +6366,11 @@ EXPORT_SYMBOL(glink_get_xprt_log_ctx);
 
 static int glink_init(void)
 {
+#ifdef CONFIG_IPC_LOGGING
 	log_ctx = ipc_log_context_create(NUM_LOG_PAGES, "glink", 0);
 	if (!log_ctx)
 		GLINK_ERR("%s: unable to create log context\n", __func__);
+#endif
 	glink_debugfs_init();
 
 	return 0;

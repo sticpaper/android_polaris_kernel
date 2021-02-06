@@ -1,5 +1,5 @@
 /* Copyright (c) 2016-2020, Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -221,26 +221,18 @@ enum vdm_state {
 
 static void *usbpd_ipc_log;
 #define usbpd_dbg(dev, fmt, ...) do { \
-	ipc_log_string(usbpd_ipc_log, "%s: %s: " fmt, dev_name(dev), __func__, \
-			##__VA_ARGS__); \
 	dev_dbg(dev, fmt, ##__VA_ARGS__); \
 	} while (0)
 
 #define usbpd_info(dev, fmt, ...) do { \
-	ipc_log_string(usbpd_ipc_log, "%s: %s: " fmt, dev_name(dev), __func__, \
-			##__VA_ARGS__); \
 	dev_info(dev, fmt, ##__VA_ARGS__); \
 	} while (0)
 
 #define usbpd_warn(dev, fmt, ...) do { \
-	ipc_log_string(usbpd_ipc_log, "%s: %s: " fmt, dev_name(dev), __func__, \
-			##__VA_ARGS__); \
 	dev_warn(dev, fmt, ##__VA_ARGS__); \
 	} while (0)
 
 #define usbpd_err(dev, fmt, ...) do { \
-	ipc_log_string(usbpd_ipc_log, "%s: %s: " fmt, dev_name(dev), __func__, \
-			##__VA_ARGS__); \
 	dev_err(dev, fmt, ##__VA_ARGS__); \
 	} while (0)
 
@@ -377,7 +369,6 @@ static void *usbpd_ipc_log;
 
 /* add for limit APDO voltage to maxium 5800mV for better efficiency */
 #define MAX_ALLOWED_APDO_UV	5800000
-
 
 static bool check_vsafe0v = true;
 module_param(check_vsafe0v, bool, 0600);
@@ -798,7 +789,9 @@ static int pd_select_pdo(struct usbpd *pd, int pdo_pos, int uv, int ua)
 		pd->requested_voltage =
 			PD_SRC_PDO_FIXED_VOLTAGE(pdo) * 50 * 1000;
 
-		/*if limit_pd_vbus is enabled, pd request uv will less than pd vbus max*/
+		/*
+		 * If limit_pd_vbus is enabled, pd request uv will less than pd vbus max
+		 */
 		if (pd->limit_pd_vbus && pd->requested_voltage > pd->pd_vbus_max_limit)
 			return -ENOTSUPP;
 
@@ -815,12 +808,14 @@ static int pd_select_pdo(struct usbpd *pd, int pdo_pos, int uv, int ua)
 
 		curr = ua / 1000;
 
-		/*if limit_pd_vbus is enabled, pd request uv will less than pd vbus max*/
+		/*
+		 * If limit_pd_vbus is enabled, pd request uv will less than pd vbus max
+		 */
 		if (pd->limit_pd_vbus && uv > pd->pd_vbus_max_limit)
 			uv = pd->pd_vbus_max_limit;
 
 		/*
-		 * set maxium allowed request voltage for apdo to 5.8V
+		 * Set maximum allowed request voltage for apdo to 5.8V
 		 * for bettery charging efficiency
 		 */
 		if (uv >= MAX_ALLOWED_APDO_UV)
@@ -1433,7 +1428,8 @@ static void usbpd_set_state(struct usbpd *pd, enum usbpd_state next_state)
 	case PE_SNK_STARTUP:
 		if (pd->current_dr == DR_NONE || pd->current_dr == DR_UFP) {
 			pd->current_dr = DR_UFP;
-			usbpd_info(&pd->dev, "%s: psy type was %d\n", __func__, pd->psy_type);
+			usbpd_dbg(&pd->dev, "%s: psy type was %d\n", __func__, pd->psy_type);
+
 			if (pd->psy_type == POWER_SUPPLY_TYPE_USB ||
 				pd->psy_type == POWER_SUPPLY_TYPE_USB_CDP ||
 				pd->psy_type == POWER_SUPPLY_TYPE_USB_FLOAT ||
@@ -3168,7 +3164,7 @@ static int psy_changed(struct notifier_block *nb, unsigned long evt, void *ptr)
 
 	pd->typec_mode = typec_mode;
 
-	usbpd_info(&pd->dev, "typec mode:%d present:%d type:%d orientation:%d\n",
+	usbpd_dbg(&pd->dev, "typec mode:%d present:%d type:%d orientation:%d\n",
 			typec_mode, pd->vbus_present, pd->psy_type,
 			usbpd_get_plug_orientation(pd));
 
@@ -4007,14 +4003,13 @@ unsigned int pd_vbus_ctrl;
 module_param(pd_vbus_ctrl, uint, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(pd_vbus_ctrl, "PD VBUS CONTROL");
 
-
 void pd_vbus_reset(struct usbpd *pd)
 {
-	if (!pd)
-	{
+	if (!pd) {
 		pr_err("pd_vbus_reset, pd is null\n");
 		return;
 	}
+
 	if (pd->vbus_enabled) {
 		pr_err("pd_vbus_reset execute\n");
 		regulator_disable(pd->vbus);
@@ -4024,9 +4019,7 @@ void pd_vbus_reset(struct usbpd *pd)
 		msleep(pd_vbus_ctrl);
 		start_usb_host(pd, true);
 		enable_vbus(pd);
-	}
-	else
-	{
+	} else {
 		pr_err("pd_vbus is not enabled yet\n");
 	}
 }
@@ -4048,7 +4041,7 @@ void kick_usbpd_vbus_sm(void)
 {
 	pm_stay_awake(&pd_lobal->dev);
 
-	/* to be done pd_lobal->sm_queued = true;*/
+	/* to be done, pd_lobal->sm_queued = true; */
 	pr_err("kick_usbpd_vbus_sm handle state %s, vbus %d\n",
 			usbpd_state_strings[pd_lobal->current_state],pd_lobal->vbus_enabled);
 
@@ -4073,8 +4066,7 @@ static ssize_t pd_vbus_store(struct device *dev,
 {
 	int val = 0;
 
-	if (sscanf(buf, "%d\n", &val) != 0)
-	{
+	if (sscanf(buf, "%d\n", &val) != 0) {
 		pr_err("pd_vbus_store input err\n");
 	}
 	pr_err("pd_vbus_store handle state %s, vbus %d,val %d\n",
@@ -4124,11 +4116,11 @@ static struct class usbpd_class = {
 
 void notify_typec_mode_changed_for_pd(void)
 {
-        /* force update as usb present is changed to absent */
-        if (pd_lobal) {
-                pr_info("notify_typec_mode_changed_for_pd\n");
-                psy_changed(&pd_lobal->psy_nb, PSY_EVENT_PROP_CHANGED, pd_lobal->usb_psy);
-        }
+	/* force update as usb present is changed to absent */
+	if (pd_lobal) {
+		pr_info("notify_typec_mode_changed_for_pd\n");
+		psy_changed(&pd_lobal->psy_nb, PSY_EVENT_PROP_CHANGED, pd_lobal->usb_psy);
+	}
 }
 EXPORT_SYMBOL_GPL(notify_typec_mode_changed_for_pd);
 
@@ -4312,8 +4304,7 @@ struct usbpd *usbpd_create(struct device *parent)
 		pd->is_sxr_dp_sink = device_property_present(parent,
 						"qcom,sxr1130-sxr-dp-sink");
 
-	ret = of_property_read_u32(parent->of_node, "mi,limit_pd_vbus",
-			&pd->limit_pd_vbus);
+	ret = of_property_read_u32(parent->of_node, "mi,limit_pd_vbus", &pd->limit_pd_vbus);
 	if (ret) {
 		usbpd_err(&pd->dev, "failed to read pd vbus limit\n");
 		pd->limit_pd_vbus = false;

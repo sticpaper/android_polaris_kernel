@@ -5,6 +5,7 @@
  *
  * Copyright (C) 2012 Alexandra Chin <alexandra.chin@tw.synaptics.com>
  * Copyright (C) 2012 Scott Lin <scott.lin@tw.synaptics.com>
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -123,12 +124,7 @@
 
 #define PINCTRL_STATE_ACTIVE	"pmx_ts_active"
 #define PINCTRL_STATE_SUSPEND	"pmx_ts_suspend"
-#ifndef CONFIG_SYNA_TOUCH_COUNT_DUMP
-#define CONFIG_SYNA_TOUCH_COUNT_DUMP
-#endif
-#ifdef CONFIG_SYNA_TOUCH_COUNT_DUMP
-#define TOUCH_COUNT_FILE_MAXSIZE 50
-#endif
+
 enum exp_fn {
 	RMI_DEV = 0,
 	RMI_FW_UPDATER,
@@ -357,11 +353,6 @@ struct synaptics_rmi4_data {
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	struct early_suspend early_suspend;
 #endif
-#ifdef CONFIG_SYNA_TOUCH_COUNT_DUMP
-	struct class *syna_tp_class;
-	struct device *syna_touch_dev;
-	char *current_clicknum_file;
-#endif
 	unsigned char current_page;
 	unsigned char button_0d_enabled;
 	unsigned char num_of_tx;
@@ -421,8 +412,6 @@ struct synaptics_rmi4_data {
 	bool chip_is_tddi;
 	bool open_test_b7;
 	bool short_test_extend;
-	bool disable_data_dump;
-	bool dump_flags;
 	int (*reset_device)(struct synaptics_rmi4_data *rmi4_data,
 			bool rebuild);
 	int (*irq_enable)(struct synaptics_rmi4_data *rmi4_data, bool enable,
@@ -436,7 +425,6 @@ struct synaptics_rmi4_data {
 	struct pinctrl_state *pinctrl_state_suspend;
 	struct synaptics_dsx_factory_param *factory_param;
 
-	struct completion dump_completion;
 #ifdef CONFIG_TOUCH_DEBUG_FS
 	struct dentry *debugfs;
 #endif
@@ -452,6 +440,7 @@ struct synaptics_rmi4_data {
 	struct clk *core_clk;
 	struct clk *iface_clk;
 #endif
+	struct proc_dir_entry *input_proc;
 	bool palm_sensor_changed;
 };
 

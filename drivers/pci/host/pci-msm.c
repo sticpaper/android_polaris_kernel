@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -235,57 +235,31 @@
 	} while (0)
 
 #define PCIE_DBG(dev, fmt, arg...) do {			 \
-	if ((dev) && (dev)->ipc_log_long)   \
-		ipc_log_string((dev)->ipc_log_long, \
-			"DBG1:%s: " fmt, __func__, arg); \
-	if ((dev) && (dev)->ipc_log)   \
-		ipc_log_string((dev)->ipc_log, "%s: " fmt, __func__, arg); \
 	if (msm_pcie_debug_mask)   \
 		pr_alert("%s: " fmt, __func__, arg);		  \
 	} while (0)
 
 #define PCIE_DBG2(dev, fmt, arg...) do {			 \
-	if ((dev) && (dev)->ipc_log)   \
-		ipc_log_string((dev)->ipc_log, "DBG2:%s: " fmt, __func__, arg);\
 	if (msm_pcie_debug_mask)   \
 		pr_alert("%s: " fmt, __func__, arg);              \
 	} while (0)
 
 #define PCIE_DBG3(dev, fmt, arg...) do {			 \
-	if ((dev) && (dev)->ipc_log)   \
-		ipc_log_string((dev)->ipc_log, "DBG3:%s: " fmt, __func__, arg);\
 	if (msm_pcie_debug_mask)   \
 		pr_alert("%s: " fmt, __func__, arg);              \
 	} while (0)
 
-#define PCIE_DUMP(dev, fmt, arg...) do {			\
-	if ((dev) && (dev)->ipc_log_dump) \
-		ipc_log_string((dev)->ipc_log_dump, \
-			"DUMP:%s: " fmt, __func__, arg); \
-	} while (0)
+#define PCIE_DUMP(dev, fmt, arg...) ((void)0)
 
 #define PCIE_DBG_FS(dev, fmt, arg...) do {			\
-	if ((dev) && (dev)->ipc_log_dump) \
-		ipc_log_string((dev)->ipc_log_dump, \
-			"DBG_FS:%s: " fmt, __func__, arg); \
 	pr_alert("%s: " fmt, __func__, arg); \
 	} while (0)
 
 #define PCIE_INFO(dev, fmt, arg...) do {			 \
-	if ((dev) && (dev)->ipc_log_long)   \
-		ipc_log_string((dev)->ipc_log_long, \
-			"INFO:%s: " fmt, __func__, arg); \
-	if ((dev) && (dev)->ipc_log)   \
-		ipc_log_string((dev)->ipc_log, "%s: " fmt, __func__, arg); \
 	pr_info("%s: " fmt, __func__, arg);  \
 	} while (0)
 
 #define PCIE_ERR(dev, fmt, arg...) do {			 \
-	if ((dev) && (dev)->ipc_log_long)   \
-		ipc_log_string((dev)->ipc_log_long, \
-			"ERR:%s: " fmt, __func__, arg); \
-	if ((dev) && (dev)->ipc_log)   \
-		ipc_log_string((dev)->ipc_log, "%s: " fmt, __func__, arg); \
 	pr_err("%s: " fmt, __func__, arg);  \
 	} while (0)
 
@@ -641,7 +615,7 @@ struct msm_pcie_dev_t {
 /* debug mask sys interface */
 static int msm_pcie_debug_mask;
 module_param_named(debug_mask, msm_pcie_debug_mask,
-			    int, 0644);
+			    int, 0);
 
 /*
  * For each bit set, invert the default capability
@@ -3773,8 +3747,6 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 
 	/* assert PCIe reset link to keep EP in reset */
 
-	PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
-		dev->rc_idx);
 	gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
 				dev->gpio[MSM_PCIE_GPIO_PERST].on);
 	usleep_range(PERST_PROPAGATION_DELAY_US_MIN,
@@ -3896,7 +3868,7 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 		dev->rc_idx, retries);
 
 	if (pcie_phy_is_ready(dev))
-		PCIE_INFO(dev, "PCIe RC%d PHY is ready!\n", dev->rc_idx);
+		PCIE_DBG(dev, "PCIe RC%d PHY!\n", dev->rc_idx);
 	else {
 		PCIE_ERR(dev, "PCIe PHY RC%d failed to come up!\n",
 			dev->rc_idx);
@@ -3914,8 +3886,6 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 
 	/* de-assert PCIe reset link to bring EP out of reset */
 
-	PCIE_INFO(dev, "PCIe: Release the reset of endpoint of RC%d.\n",
-		dev->rc_idx);
 	gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
 				1 - dev->gpio[MSM_PCIE_GPIO_PERST].on);
 	usleep_range(dev->perst_delay_us_min, dev->perst_delay_us_max);
@@ -3959,10 +3929,7 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 		msm_pcie_confirm_linkup(dev, false, false, NULL)) {
 		PCIE_DBG(dev, "Link is up after %d checkings\n",
 			link_check_count);
-		PCIE_INFO(dev, "PCIe RC%d link initialized\n", dev->rc_idx);
 	} else {
-		PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
-			dev->rc_idx);
 		gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
 			dev->gpio[MSM_PCIE_GPIO_PERST].on);
 		PCIE_ERR(dev, "PCIe RC%d link initialization failed\n",
@@ -4064,9 +4031,6 @@ static void msm_pcie_disable(struct msm_pcie_dev_t *dev, u32 options)
 	dev->link_status = MSM_PCIE_LINK_DISABLED;
 	dev->power_on = false;
 	dev->link_turned_off_counter++;
-
-	PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
-		dev->rc_idx);
 
 	gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
 				dev->gpio[MSM_PCIE_GPIO_PERST].on);
@@ -4960,47 +4924,58 @@ static struct irq_chip pcie_msi_chip = {
 	.irq_unmask = unmask_msi_irq,
 };
 
-static int msm_pcie_create_irq(struct irq_domain *domain, unsigned int irq_base,
-				irq_hw_number_t hwirq_base, int count)
+static int msm_pcie_create_irq(struct msm_pcie_dev_t *dev)
 {
-	struct device_node *of_node;
-	int ret;
+	int irq, pos;
 
-	of_node = irq_domain_get_of_node(domain);
-	ret = __irq_alloc_descs(irq_base, hwirq_base, count,
-			of_node_to_nid(of_node), THIS_MODULE, NULL);
-	if (unlikely(ret < 0))
-		return ret;
+	PCIE_DBG(dev, "RC%d\n", dev->rc_idx);
 
-	irq_domain_associate_many(domain, ret, hwirq_base, count);
-	return ret;
+again:
+	pos = find_first_zero_bit(dev->msi_irq_in_use, PCIE_MSI_NR_IRQS);
+
+	if (pos >= PCIE_MSI_NR_IRQS)
+		return -ENOSPC;
+
+	PCIE_DBG(dev, "pos:%d msi_irq_in_use:%ld\n", pos, *dev->msi_irq_in_use);
+
+	if (test_and_set_bit(pos, dev->msi_irq_in_use))
+		goto again;
+	else
+		PCIE_DBG(dev, "test_and_set_bit is successful pos=%d\n", pos);
+
+	irq = irq_create_mapping(dev->irq_domain, pos);
+	if (!irq)
+		return -EINVAL;
+
+	return irq;
 }
 
 static int arch_setup_msi_irq_default(struct pci_dev *pdev,
 		struct msi_desc *desc, int nvec)
 {
-	int irq, index, firstirq = 0;
+	int irq;
 	struct msi_msg msg;
 	struct msm_pcie_dev_t *dev = PCIE_BUS_PRIV_DATA(pdev->bus);
 
 	PCIE_DBG(dev, "RC%d\n", dev->rc_idx);
 
-	firstirq = msm_pcie_create_irq(dev->irq_domain, -1, 0, nvec);
+	irq = msm_pcie_create_irq(dev);
 
-	PCIE_DBG(dev, "%d IRQs are allocated.\n", nvec);
+	PCIE_DBG(dev, "IRQ %d is allocated.\n", irq);
 
-	if (firstirq < 0)
+	if (irq < 0)
 		return irq;
 
-	for (index = 0, irq = firstirq ; index < nvec; index++, irq++) {
-		irq_set_chip_data(irq, pdev);
-		irq_set_msi_desc(irq, desc);
-		/* write msi vector and data */
-		msg.address_hi = 0;
-		msg.address_lo = MSM_PCIE_MSI_PHY;
-		msg.data = irq - irq_find_mapping(dev->irq_domain, 0);
-		write_msi_msg(irq, &msg);
-	}
+	PCIE_DBG(dev, "irq %d allocated\n", irq);
+
+	irq_set_chip_data(irq, pdev);
+	irq_set_msi_desc(irq, desc);
+
+	/* write msi vector and data */
+	msg.address_hi = 0;
+	msg.address_lo = MSM_PCIE_MSI_PHY;
+	msg.data = irq - irq_find_mapping(dev->irq_domain, 0);
+	write_msi_msg(irq, &msg);
 
 	return 0;
 }
@@ -5178,6 +5153,7 @@ static const struct irq_domain_ops msm_pcie_msi_ops = {
 static int32_t msm_pcie_irq_init(struct msm_pcie_dev_t *dev)
 {
 	int rc;
+	int msi_start =  0;
 	struct device *pdev = &dev->pdev->dev;
 
 	PCIE_DBG(dev, "RC%d\n", dev->rc_idx);
@@ -5308,6 +5284,7 @@ static int32_t msm_pcie_irq_init(struct msm_pcie_dev_t *dev)
 			return PTR_ERR(dev->irq_domain);
 		}
 
+		msi_start = irq_create_mapping(dev->irq_domain, 0);
 	}
 
 	return 0;
@@ -6156,14 +6133,16 @@ static struct platform_driver msm_pcie_driver = {
 static int __init pcie_init(void)
 {
 	int ret = 0, i;
+#ifdef CONFIG_IPC_LOGGING
 	char rc_name[MAX_RC_NAME_LEN];
-
+#endif
 	pr_alert("pcie:%s.\n", __func__);
 
 	pcie_drv.rc_num = 0;
 	mutex_init(&pcie_drv.drv_lock);
 
 	for (i = 0; i < MAX_RC_NUM; i++) {
+#ifdef CONFIG_IPC_LOGGING
 		snprintf(rc_name, MAX_RC_NAME_LEN, "pcie%d-short", i);
 		msm_pcie_dev[i].ipc_log =
 			ipc_log_context_create(PCIE_LOG_PAGES, rc_name, 0);
@@ -6194,6 +6173,7 @@ static int __init pcie_init(void)
 			PCIE_DBG(&msm_pcie_dev[i],
 				"PCIe IPC logging %s is enable for RC%d\n",
 				rc_name, i);
+#endif
 		spin_lock_init(&msm_pcie_dev[i].cfg_lock);
 		msm_pcie_dev[i].cfg_access = true;
 		mutex_init(&msm_pcie_dev[i].enumerate_lock);
@@ -6244,9 +6224,6 @@ module_exit(pcie_exit);
 /* RC do not represent the right class; set it to PCI_CLASS_BRIDGE_PCI */
 static void msm_pcie_fixup_early(struct pci_dev *dev)
 {
-	struct msm_pcie_dev_t *pcie_dev = PCIE_BUS_PRIV_DATA(dev->bus);
-
-	PCIE_DBG(pcie_dev, "hdr_type %d\n", dev->hdr_type);
 	if (pci_is_root_bus(dev->bus))
 		dev->class = (dev->class & 0xff) | (PCI_CLASS_BRIDGE_PCI << 8);
 }

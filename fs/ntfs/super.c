@@ -771,10 +771,6 @@ static bool parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 
 	vol->sector_size = le16_to_cpu(b->bpb.bytes_per_sector);
 	vol->sector_size_bits = ffs(vol->sector_size) - 1;
-	ntfs_debug("vol->sector_size = %i (0x%x)", vol->sector_size,
-			vol->sector_size);
-	ntfs_debug("vol->sector_size_bits = %i (0x%x)", vol->sector_size_bits,
-			vol->sector_size_bits);
 	if (vol->sector_size < vol->sb->s_blocksize) {
 		ntfs_error(vol->sb, "Sector size (%i) is smaller than the "
 				"device block size (%lu).  This is not "
@@ -782,19 +778,11 @@ static bool parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 				vol->sb->s_blocksize);
 		return false;
 	}
-	ntfs_debug("sectors_per_cluster = 0x%x", b->bpb.sectors_per_cluster);
 	sectors_per_cluster_bits = ffs(b->bpb.sectors_per_cluster) - 1;
-	ntfs_debug("sectors_per_cluster_bits = 0x%x",
-			sectors_per_cluster_bits);
 	nr_hidden_sects = le32_to_cpu(b->bpb.hidden_sectors);
-	ntfs_debug("number of hidden sectors = 0x%x", nr_hidden_sects);
 	vol->cluster_size = vol->sector_size << sectors_per_cluster_bits;
 	vol->cluster_size_mask = vol->cluster_size - 1;
 	vol->cluster_size_bits = ffs(vol->cluster_size) - 1;
-	ntfs_debug("vol->cluster_size = %i (0x%x)", vol->cluster_size,
-			vol->cluster_size);
-	ntfs_debug("vol->cluster_size_mask = 0x%x", vol->cluster_size_mask);
-	ntfs_debug("vol->cluster_size_bits = %i", vol->cluster_size_bits);
 	if (vol->cluster_size < vol->sector_size) {
 		ntfs_error(vol->sb, "Cluster size (%i) is smaller than the "
 				"sector size (%i).  This is not supported.  "
@@ -802,8 +790,6 @@ static bool parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 		return false;
 	}
 	clusters_per_mft_record = b->clusters_per_mft_record;
-	ntfs_debug("clusters_per_mft_record = %i (0x%x)",
-			clusters_per_mft_record, clusters_per_mft_record);
 	if (clusters_per_mft_record > 0)
 		vol->mft_record_size = vol->cluster_size <<
 				(ffs(clusters_per_mft_record) - 1);
@@ -816,12 +802,6 @@ static bool parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 		vol->mft_record_size = 1 << -clusters_per_mft_record;
 	vol->mft_record_size_mask = vol->mft_record_size - 1;
 	vol->mft_record_size_bits = ffs(vol->mft_record_size) - 1;
-	ntfs_debug("vol->mft_record_size = %i (0x%x)", vol->mft_record_size,
-			vol->mft_record_size);
-	ntfs_debug("vol->mft_record_size_mask = 0x%x",
-			vol->mft_record_size_mask);
-	ntfs_debug("vol->mft_record_size_bits = %i (0x%x)",
-			vol->mft_record_size_bits, vol->mft_record_size_bits);
 	/*
 	 * We cannot support mft record sizes above the PAGE_SIZE since
 	 * we store $MFT/$DATA, the table of mft records in the page cache.
@@ -857,13 +837,6 @@ static bool parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 		vol->index_record_size = 1 << -clusters_per_index_record;
 	vol->index_record_size_mask = vol->index_record_size - 1;
 	vol->index_record_size_bits = ffs(vol->index_record_size) - 1;
-	ntfs_debug("vol->index_record_size = %i (0x%x)",
-			vol->index_record_size, vol->index_record_size);
-	ntfs_debug("vol->index_record_size_mask = 0x%x",
-			vol->index_record_size_mask);
-	ntfs_debug("vol->index_record_size_bits = %i (0x%x)",
-			vol->index_record_size_bits,
-			vol->index_record_size_bits);
 	/* We cannot support index record sizes below the sector size. */
 	if (vol->index_record_size < vol->sector_size) {
 		ntfs_error(vol->sb, "Index record size (%i) is smaller than "
@@ -3201,8 +3174,7 @@ static void __exit exit_ntfs_fs(void)
 }
 
 MODULE_AUTHOR("Anton Altaparmakov <anton@tuxera.com>");
-MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2014 Anton Altaparmakov and Tuxera Inc.");
-MODULE_VERSION(NTFS_VERSION);
+MODULE_DESCRIPTION("NTFS driver");
 MODULE_LICENSE("GPL");
 #ifdef DEBUG
 module_param(debug_msgs, bint, 0);

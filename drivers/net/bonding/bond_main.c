@@ -3007,8 +3007,6 @@ static int bond_event_changename(struct bonding *bond)
 	bond_remove_proc_entry(bond);
 	bond_create_proc_entry(bond);
 
-	bond_debug_reregister(bond);
-
 	return NOTIFY_DONE;
 }
 
@@ -4296,10 +4294,7 @@ static void bond_uninit(struct net_device *bond_dev)
 
 	list_del(&bond->bond_list);
 
-	bond_debug_unregister(bond);
 }
-
-/*------------------------- Module initialization ---------------------------*/
 
 static int bond_check_params(struct bond_params *params)
 {
@@ -4692,8 +4687,6 @@ static int bond_init(struct net_device *bond_dev)
 
 	bond_prepare_sysfs_group(bond);
 
-	bond_debug_register(bond);
-
 	/* Ensure valid dev_addr */
 	if (is_zero_ether_addr(bond_dev->dev_addr) &&
 	    bond_dev->addr_assign_type == NET_ADDR_PERM)
@@ -4808,8 +4801,6 @@ static int __init bonding_init(void)
 	if (res)
 		goto err_link;
 
-	bond_create_debugfs();
-
 	for (i = 0; i < max_bonds; i++) {
 		res = bond_create(&init_net, NULL);
 		if (res)
@@ -4820,7 +4811,6 @@ static int __init bonding_init(void)
 out:
 	return res;
 err:
-	bond_destroy_debugfs();
 	bond_netlink_fini();
 err_link:
 	unregister_pernet_subsys(&bond_net_ops);
@@ -4831,8 +4821,6 @@ err_link:
 static void __exit bonding_exit(void)
 {
 	unregister_netdevice_notifier(&bond_netdev_notifier);
-
-	bond_destroy_debugfs();
 
 	bond_netlink_fini();
 	unregister_pernet_subsys(&bond_net_ops);
@@ -4846,6 +4834,5 @@ static void __exit bonding_exit(void)
 module_init(bonding_init);
 module_exit(bonding_exit);
 MODULE_LICENSE("GPL");
-MODULE_VERSION(DRV_VERSION);
 MODULE_DESCRIPTION(DRV_DESCRIPTION ", v" DRV_VERSION);
 MODULE_AUTHOR("Thomas Davis, tadavis@lbl.gov and many others");

@@ -177,6 +177,14 @@ static struct psi_group psi_system = {
 	.pcpu = &system_group_pcpu,
 };
 
+/* ioctl cmd to get info of  last psi trigger event*/
+struct psi_event_info {
+	u64 last_event_time;
+	u64 last_event_growth;
+};
+
+#define GET_LAST_PSI_EVENT_INFO _IOR('p', 1, struct psi_event_info)
+
 static void psi_avgs_work(struct work_struct *work);
 
 static void group_init(struct psi_group *group)
@@ -534,10 +542,11 @@ static u64 update_triggers(struct psi_group *group, u64 now)
 		if (now < t->last_event_time + t->win.size)
 			continue;
 
+		t->last_event_time = now;
+		t->last_event_growth = growth;
 		/* Generate an event */
 		if (cmpxchg(&t->event, 0, 1) == 0)
 			wake_up_interruptible(&t->event_wait);
-		t->last_event_time = now;
 	}
 
 	if (new_stall)
@@ -1140,7 +1149,6 @@ static void psi_trigger_destroy(struct kref *ref)
 		 */
 		kthread_cancel_delayed_work_sync(&group->poll_work);
 		atomic_set(&group->poll_scheduled, 0);
-
 		kthread_destroy_worker(kworker_to_destroy);
 	}
 	kfree(t);

@@ -744,7 +744,6 @@ static bool __init_or_module initcall_blacklisted(initcall_t fn)
 #else
 static int __init initcall_blacklist(char *str)
 {
-	pr_warn("initcall_blacklist requires CONFIG_KALLSYMS\n");
 	return 0;
 }
 

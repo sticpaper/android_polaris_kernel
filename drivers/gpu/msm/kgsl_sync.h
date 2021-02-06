@@ -33,7 +33,6 @@
  */
 struct kgsl_sync_timeline {
 	struct kref kref;
-	char name[KGSL_TIMELINE_NAME_LEN];
 
 	u64 fence_context;
 

@@ -969,7 +969,6 @@ static int ext4_drop_inode(struct inode *inode)
 {
 	int drop = generic_drop_inode(inode);
 
-	trace_ext4_drop_inode(inode, drop);
 	return drop;
 }
 
@@ -1085,7 +1084,6 @@ static int ext4_nfs_commit_metadata(struct inode *inode)
 		.sync_mode = WB_SYNC_ALL
 	};
 
-	trace_ext4_nfs_commit_metadata(inode);
 	return ext4_write_inode(inode, &wbc);
 }
 
@@ -1301,6 +1299,7 @@ enum {
 	Opt_dioread_nolock, Opt_dioread_lock,
 	Opt_discard, Opt_nodiscard, Opt_init_itable, Opt_noinit_itable,
 	Opt_max_dir_size_kb, Opt_nojournal_checksum,
+	Opt_async_fsync, Opt_noasync_fsync,
 };
 
 static const match_table_t tokens = {
@@ -1382,11 +1381,13 @@ static const match_table_t tokens = {
 	{Opt_noinit_itable, "noinit_itable"},
 	{Opt_max_dir_size_kb, "max_dir_size_kb=%u"},
 	{Opt_test_dummy_encryption, "test_dummy_encryption"},
-	{Opt_removed, "check=none"},	/* mount option from ext2/3 */
-	{Opt_removed, "nocheck"},	/* mount option from ext2/3 */
-	{Opt_removed, "reservation"},	/* mount option from ext2/3 */
-	{Opt_removed, "noreservation"}, /* mount option from ext2/3 */
-	{Opt_removed, "journal=%u"},	/* mount option from ext2/3 */
+	{Opt_removed, "check=none"},
+	{Opt_removed, "nocheck"},
+	{Opt_removed, "reservation"},
+	{Opt_removed, "noreservation"},
+	{Opt_removed, "journal=%u"},
+	{Opt_async_fsync, "async_fsync"},
+	{Opt_noasync_fsync, "noasync_fsync"},
 	{Opt_err, NULL},
 };
 
@@ -1587,6 +1588,8 @@ static const struct mount_opts {
 	{Opt_jqfmt_vfsv1, QFMT_VFS_V1, MOPT_QFMT},
 	{Opt_max_dir_size_kb, 0, MOPT_GTE0},
 	{Opt_test_dummy_encryption, 0, MOPT_GTE0},
+	{Opt_async_fsync, EXT4_MOUNT_ASYNC_FSYNC, MOPT_SET},
+	{Opt_noasync_fsync, EXT4_MOUNT_ASYNC_FSYNC, MOPT_CLEAR},
 	{Opt_err, 0, 0}
 };
 
@@ -2278,8 +2281,6 @@ static int ext4_check_descriptors(struct super_block *sb,
 	if (ext4_has_feature_flex_bg(sb))
 		flexbg_flag = 1;
 
-	ext4_debug("Checking group descriptors");
-
 	for (i = 0; i < sbi->s_groups_count; i++) {
 		struct ext4_group_desc *gdp = ext4_get_group_desc(sb, i, NULL);
 
@@ -2480,7 +2481,6 @@ static void ext4_orphan_cleanup(struct super_block *sb,
 		 * so, skip the rest.
 		 */
 		if (EXT4_SB(sb)->s_mount_state & EXT4_ERROR_FS) {
-			jbd_debug(1, "Skipping orphan recovery on fs with errors.\n");
 			es->s_last_orphan = 0;
 			break;
 		}
@@ -2498,8 +2498,6 @@ static void ext4_orphan_cleanup(struct super_block *sb,
 				ext4_msg(sb, KERN_DEBUG,
 					"%s: truncating inode %lu to %lld bytes",
 					__func__, inode->i_ino, inode->i_size);
-			jbd_debug(2, "truncating inode %lu to %lld bytes\n",
-				  inode->i_ino, inode->i_size);
 			inode_lock(inode);
 			truncate_inode_pages(inode->i_mapping, inode->i_size);
 			ext4_truncate(inode);
@@ -3575,10 +3573,13 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		set_opt(sb, ERRORS_CONT);
 	else
 		set_opt(sb, ERRORS_RO);
-	/* block_validity enabled by default; disable with noblock_validity */
-	set_opt(sb, BLOCK_VALIDITY);
+	/* It is only used for debugging block metadata */
+	set_opt(sb, NOBLOCK_VALIDITY);
+
 	if (def_mount_opts & EXT4_DEFM_DISCARD)
 		set_opt(sb, DISCARD);
+
+	set_opt(sb, ASYNC_FSYNC);
 
 	sbi->s_resuid = make_kuid(&init_user_ns, le16_to_cpu(es->s_def_resuid));
 	sbi->s_resgid = make_kgid(&init_user_ns, le16_to_cpu(es->s_def_resgid));
@@ -3589,18 +3590,10 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	if ((def_mount_opts & EXT4_DEFM_NOBARRIER) == 0)
 		set_opt(sb, BARRIER);
 
-	/*
-	 * enable delayed allocation by default
-	 * Use -o nodelalloc to turn it off
-	 */
 	if (!IS_EXT3_SB(sb) && !IS_EXT2_SB(sb) &&
 	    ((def_mount_opts & EXT4_DEFM_NODELALLOC) == 0))
 		set_opt(sb, DELALLOC);
 
-	/*
-	 * set default s_li_wait_mult for lazyinit, for the case there is
-	 * no mount option specified.
-	 */
 	sbi->s_li_wait_mult = EXT4_DEF_LI_WAIT_MULT;
 
 	if (sbi->s_es->s_mount_opts[0]) {
@@ -3852,7 +3845,6 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		}
 	}
 
-	/* Handle clustersize */
 	clustersize = BLOCK_SIZE << le32_to_cpu(es->s_log_cluster_size);
 	has_bigalloc = ext4_has_feature_bigalloc(sb);
 	if (has_bigalloc) {
@@ -3898,14 +3890,9 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	sbi->s_cluster_ratio = clustersize / blocksize;
 
-	/* Do we have standard group size of clustersize * 8 blocks ? */
 	if (sbi->s_blocks_per_group == clustersize << 3)
 		set_opt2(sb, STD_GROUP_SIZE);
 
-	/*
-	 * Test whether we have more sectors than will fit in sector_t,
-	 * and whether the max offset is addressable by the page cache.
-	 */
 	err = generic_check_addressable(sb->s_blocksize_bits,
 					ext4_blocks_count(es));
 	if (err) {
@@ -3928,10 +3915,6 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 		goto failed_mount;
 	}
 
-	/*
-	 * It makes no sense for the first data block to be beyond the end
-	 * of the filesystem.
-	 */
 	if (le32_to_cpu(es->s_first_data_block) >= ext4_blocks_count(es)) {
 		ext4_msg(sb, KERN_WARNING, "bad geometry: first data "
 			 "block %u is beyond end of filesystem (%llu)",
@@ -4161,7 +4144,7 @@ no_journal:
 		goto failed_mount_wq;
 	}
 
-	if ((DUMMY_ENCRYPTION_ENABLED(sbi) || ANDROID_ENCRYPTION_ENABLED(sbi)) && !(sb->s_flags & MS_RDONLY) &&
+	if (DUMMY_ENCRYPTION_ENABLED(sbi) && !(sb->s_flags & MS_RDONLY) &&
 	    !ext4_has_feature_encrypt(sb)) {
 		ext4_set_feature_encrypt(sb);
 		ext4_commit_super(sb, 1);
@@ -4455,8 +4438,7 @@ static struct inode *ext4_get_journal_inode(struct super_block *sb,
 		return NULL;
 	}
 
-	jbd_debug(2, "Journal inode found at %p: %lld bytes\n",
-		  journal_inode, journal_inode->i_size);
+
 	if (!S_ISREG(journal_inode->i_mode)) {
 		ext4_msg(sb, KERN_ERR, "invalid journal inode");
 		iput(journal_inode);
@@ -4845,7 +4827,6 @@ static int ext4_sync_fs(struct super_block *sb, int wait)
 	bool needs_barrier = false;
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 
-	trace_ext4_sync_fs(sb, wait);
 	flush_workqueue(sbi->rsv_conversion_wq);
 	/*
 	 * Writeback quota in non-journalled quota case - journalled quota has

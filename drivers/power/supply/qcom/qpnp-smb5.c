@@ -1,5 +1,5 @@
 /* Copyright (c) 2018 The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1750,13 +1750,6 @@ static int smb5_configure_typec(struct smb_charger *chg)
 			"Couldn't configure Type-C interrupts rc=%d\n", rc);
 		return rc;
 	}
-
-	rc = smblib_masked_write(chg, USBIN_LOAD_CFG_REG,
-		USBIN_IN_COLLAPSE_GF_SEL_MASK | USBIN_AICL_STEP_TIMING_SEL_MASK,
-		0);
-	if (rc < 0)
-		dev_err(chg->dev,
-			"Couldn't set USBIN_LOAD_CFG_REG rc=%d\n", rc);
 
 	return rc;
 }

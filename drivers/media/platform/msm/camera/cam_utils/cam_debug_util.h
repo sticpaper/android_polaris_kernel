@@ -1,5 +1,4 @@
-/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -36,7 +35,19 @@
 #define CAM_CTXT       (1 << 19)
 #define CAM_OIS        (1 << 20)
 #define CAM_RES        (1 << 21)
-#define CAM_SL_EEPROM  (1 << 22)
+#define CAM_MEM        (1 << 22)
+#define CAM_IR_LED     (1 << 23)
+
+/* CAM_IRQ_CTRL: For events in irq controller */
+#define CAM_IRQ_CTRL   (1 << 23)
+
+/* CAM_REQ: Tracks a request submitted to KMD */
+#define CAM_REQ        (1 << 24)
+
+/* CAM_PERF: Used for performance (clock, BW etc) logs */
+#define CAM_PERF       (1 << 25)
+
+#define CAM_SL_EEPROM  (1 << 26)
 
 #define STR_BUFFER_MAX_LENGTH  1024
 
@@ -53,8 +64,10 @@
  * @fmt       :  Formatted string which needs to be print in the log
  *
  */
-void cam_debug_log(unsigned int module_id, const char *func, const int line,
-	const char *fmt, ...);
+static inline void cam_debug_log(unsigned int module_id, const char *func,
+				 const int line, const char *fmt, ...)
+{
+}
 
 /*
  * cam_get_module_name()
@@ -63,7 +76,10 @@ void cam_debug_log(unsigned int module_id, const char *func, const int line,
  *
  * @module_id :  Module ID which is using this function
  */
-const char *cam_get_module_name(unsigned int module_id);
+static inline const char *cam_get_module_name(unsigned int module_id)
+{
+	return NULL;
+}
 
 /*
  * CAM_ERR
@@ -74,8 +90,7 @@ const char *cam_get_module_name(unsigned int module_id);
  * @args     :  Arguments which needs to be print in log
  */
 #define CAM_ERR(__module, fmt, args...)                            \
-	pr_err("CAM_ERR: %s: %s: %d " fmt "\n",                     \
-		cam_get_module_name(__module), __func__,  __LINE__, ##args)
+	cam_debug_log(__module, __func__, __LINE__, fmt, ##args)
 /*
  * CAM_WARN
  * @brief    :  This Macro will print warning logs
@@ -85,8 +100,7 @@ const char *cam_get_module_name(unsigned int module_id);
  * @args     :  Arguments which needs to be print in log
  */
 #define CAM_WARN(__module, fmt, args...)                           \
-	pr_warn("CAM_WARN: %s: %s: %d " fmt "\n",                     \
-		cam_get_module_name(__module), __func__,  __LINE__, ##args)
+	cam_debug_log(__module, __func__, __LINE__, fmt, ##args)
 /*
  * CAM_INFO
  * @brief    :  This Macro will print Information logs
@@ -96,11 +110,20 @@ const char *cam_get_module_name(unsigned int module_id);
  * @args     :  Arguments which needs to be print in log
  */
 #define CAM_INFO(__module, fmt, args...)                           \
-	pr_info("CAM_INFO: %s: %s: %d " fmt "\n",                     \
-		cam_get_module_name(__module), __func__,  __LINE__, ##args)
+	cam_debug_log(__module, __func__, __LINE__, fmt, ##args)
+/*
+ * CAM_INFO_RATE_LIMIT
+ * @brief    :  This Macro will print info logs with ratelimit
+ *
+ * @__module :  Respective module id which is been calling this Macro
+ * @fmt      :  Formatted string which needs to be print in log
+ * @args     :  Arguments which needs to be print in log
+ */
+#define CAM_INFO_RATE_LIMIT(__module, fmt, args...)                 \
+	cam_debug_log(__module, __func__, __LINE__, fmt, ##args)
 /*
  * CAM_DBG
- * @brief :     This Macro will print debug logs when enabled using GROUP
+ * @brief    :  This Macro will print debug logs when enabled using GROUP
  *
  * @__module :  Respective module id which is been calling this Macro
  * @fmt      :  Formatted string which needs to be print in log
@@ -111,10 +134,9 @@ const char *cam_get_module_name(unsigned int module_id);
 
 /*
  * CAM_ERR_RATE_LIMIT
- * @brief :     This Macro will prevent error print logs with ratelimit
+ * @brief    :  This Macro will print error print logs with ratelimit
  */
 #define CAM_ERR_RATE_LIMIT(__module, fmt, args...)                 \
-	pr_err_ratelimited("CAM_ERR: %s: %s: %d " fmt "\n",            \
-		cam_get_module_name(__module), __func__,  __LINE__, ##args)
+	cam_debug_log(__module, __func__, __LINE__, fmt, ##args)
 
 #endif /* _CAM_DEBUG_UTIL_H_ */

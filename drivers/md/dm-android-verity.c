@@ -304,6 +304,8 @@ static int verify_header(struct android_metadata_header *header)
 {
 	int retval = -EINVAL;
 
+	return VERITY_STATE_DISABLE;
+
 	if (is_userdebug() && le32_to_cpu(header->magic_number) ==
 			VERITY_METADATA_MAGIC_DISABLE)
 		return VERITY_STATE_DISABLE;
@@ -372,11 +374,6 @@ static int extract_metadata(dev_t dev, struct fec_header *fec,
 
 	memcpy(header, page_address(payload.page_io[0]),
 		sizeof(*header));
-
-	DMINFO("bio magic_number:%u protocol_version:%d table_length:%u",
-		le32_to_cpu(header->magic_number),
-		le32_to_cpu(header->protocol_version),
-		le32_to_cpu(header->table_length));
 
 	err = verify_header(header);
 
@@ -712,8 +709,6 @@ static int android_verity_ctr(struct dm_target *ti, unsigned argc, char **argv)
 		return create_linear_device(ti, dev, target_device);
 
 	strreplace(key_id, '#', ' ');
-
-	DMINFO("key:%s dev:%s", key_id, target_device);
 
 	if (extract_fec_header(dev, &fec, &ecc)) {
 		DMERR("Error while extracting fec header");

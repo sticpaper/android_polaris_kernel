@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018,2020 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -402,8 +402,6 @@ static void a6xx_pwrup_reglist_init(struct adreno_device *adreno_dev)
 
 static void a6xx_init(struct adreno_device *adreno_dev)
 {
-	a6xx_crashdump_init(adreno_dev);
-
 	/*
 	 * If the GMU is not enabled, rewrite the offset for the always on
 	 * counters to point to the CP always on instead of GMU always on
@@ -2271,7 +2269,8 @@ static int a6xx_complete_rpmh_votes(struct kgsl_device *device)
 
 static int a6xx_gmu_suspend(struct kgsl_device *device)
 {
-	int ret = 0;
+	/* Max GX clients on A6xx is 2: GMU and KMD */
+	int ret = 0, max_client_num = 2;
 	struct gmu_device *gmu = &device->gmu;
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 
@@ -2291,7 +2290,7 @@ static int a6xx_gmu_suspend(struct kgsl_device *device)
 	a6xx_complete_rpmh_votes(device);
 
 	if (gmu->gx_gdsc) {
-		if (a6xx_gx_is_on(adreno_dev)) {
+		if (regulator_is_enabled(gmu->gx_gdsc)) {
 			/* Switch gx gdsc control from GMU to CPU
 			 * force non-zero reference count in clk driver
 			 * so next disable call will turn
@@ -2300,16 +2299,18 @@ static int a6xx_gmu_suspend(struct kgsl_device *device)
 			ret = regulator_enable(gmu->gx_gdsc);
 			if (ret)
 				dev_err(&gmu->pdev->dev,
-					"suspend fail: gx enable %d\n", ret);
+					"suspend fail: gx enable\n");
 
-			ret = regulator_disable(gmu->gx_gdsc);
-			if (ret)
-				dev_err(&gmu->pdev->dev,
-					"suspend fail: gx disable %d\n", ret);
+			while ((max_client_num)) {
+				ret = regulator_disable(gmu->gx_gdsc);
+				if (!regulator_is_enabled(gmu->gx_gdsc))
+					break;
+				max_client_num -= 1;
+			}
 
-			if (a6xx_gx_is_on(adreno_dev))
+			if (!max_client_num)
 				dev_err(&gmu->pdev->dev,
-					"suspend fail: gx is stuck on\n");
+					"suspend fail: cannot disable gx\n");
 		}
 	}
 
@@ -2701,6 +2702,7 @@ static struct adreno_irq a6xx_irq = {
 	.mask = A6XX_INT_MASK,
 };
 
+#if 0
 static struct adreno_snapshot_sizes a6xx_snap_sizes = {
 	.cp_pfp = 0x33,
 	.roq = 0x400,
@@ -3123,6 +3125,7 @@ static struct adreno_coresight a6xx_coresight_cx = {
 	.count = ARRAY_SIZE(a6xx_coresight_regs_cx),
 	.groups = a6xx_coresight_groups_cx,
 };
+#endif
 
 static struct adreno_perfcount_register a6xx_perfcounters_cp[] = {
 	{ KGSL_PERFCOUNTER_NOT_USED, 0, 0, A6XX_RBBM_PERFCTR_CP_0_LO,
@@ -3875,10 +3878,7 @@ unlock:
 struct adreno_gpudev adreno_a6xx_gpudev = {
 	.reg_offsets = &a6xx_reg_offsets,
 	.start = a6xx_start,
-	.snapshot = a6xx_snapshot,
 	.irq = &a6xx_irq,
-	.snapshot_data = &a6xx_snapshot_data,
-	.irq_trace = trace_kgsl_a5xx_irq_status,
 	.num_prio_levels = KGSL_PRIORITY_MAX_RB_LEVELS,
 	.platform_setup = a6xx_platform_setup,
 	.init = a6xx_init,
@@ -3914,5 +3914,4 @@ struct adreno_gpudev adreno_a6xx_gpudev = {
 	.sptprac_is_on = a6xx_sptprac_is_on,
 	.ccu_invalidate = a6xx_ccu_invalidate,
 	.perfcounter_update = a6xx_perfcounter_update,
-	.coresight = {&a6xx_coresight, &a6xx_coresight_cx},
 };

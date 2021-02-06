@@ -34,7 +34,6 @@
 #include <linux/pm_runtime.h>
 #include <linux/blk-cgroup.h>
 #include <linux/psi.h>
-#include <linux/mi_io.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/block.h>
@@ -310,9 +309,7 @@ inline void __blk_run_queue_uncond(struct request_queue *q)
 	 * can wait until all these request_fn calls have finished.
 	 */
 	q->request_fn_active++;
-	preempt_disable();
 	q->request_fn(q);
-	preempt_enable();
 	q->request_fn_active--;
 }
 EXPORT_SYMBOL_GPL(__blk_run_queue_uncond);
@@ -327,27 +324,10 @@ EXPORT_SYMBOL_GPL(__blk_run_queue_uncond);
  */
 void __blk_run_queue(struct request_queue *q)
 {
-	u64 s_running_time, s_runnable_time;
-	unsigned long s_total_time;
-	unsigned int delta;
-
 	if (unlikely(blk_queue_stopped(q)))
 		return;
 
-	s_total_time = jiffies;
-	s_running_time = current->se.sum_exec_runtime;
-	s_runnable_time = current->sched_info.run_delay;
 	__blk_run_queue_uncond(q);
-	if (IO_SHOW_LOG) {
-		delta = jiffies_to_msecs(jiffies - s_total_time);
-		if (delta > IO_BLK_DRIVER_LEVEL) {
-			pr_info("Slow IO Driver:  %d(%s) prio(%d|%d), total_time(%dms) running_time(%lluns) runnable(%lluns)\n",
-				current->pid, current->comm,
-				current->policy, current->prio, delta,
-				current->se.sum_exec_runtime - s_running_time,
-				current->sched_info.run_delay - s_runnable_time);
-		}
-	}
 }
 EXPORT_SYMBOL(__blk_run_queue);
 
@@ -1189,7 +1169,6 @@ out:
 	if (ioc_batching(q, ioc))
 		ioc->nr_batch_requests--;
 
-	trace_block_getrq(q, bio, op);
 	return rq;
 
 fail_elvpriv:
@@ -1273,10 +1252,12 @@ retry:
 	prepare_to_wait_exclusive(&rl->wait[is_sync], &wait,
 				  TASK_UNINTERRUPTIBLE);
 
-	trace_block_sleeprq(q, bio, op);
-
 	spin_unlock_irq(q->queue_lock);
-	io_schedule();
+	/*
+	 * FIXME: this should be io_schedule().  The timeout is there as a
+	 * workaround for some io timeout problems.
+	 */
+	io_schedule_timeout(5*HZ);
 
 	/*
 	 * After sleeping, we become a "batching" process and will be able
@@ -1352,7 +1333,6 @@ void blk_requeue_request(struct request_queue *q, struct request *rq)
 {
 	blk_delete_timer(rq);
 	blk_clear_rq_complete(rq);
-	trace_block_rq_requeue(q, rq);
 
 	if (rq->cmd_flags & REQ_QUEUED)
 		blk_queue_end_tag(q, rq);
@@ -1521,8 +1501,6 @@ bool bio_attempt_back_merge(struct request_queue *q, struct request *req,
 	if (!ll_back_merge_fn(q, req, bio))
 		return false;
 
-	trace_block_bio_backmerge(q, req, bio);
-
 	if ((req->cmd_flags & REQ_FAILFAST_MASK) != ff)
 		blk_rq_set_mixed_merge(req);
 
@@ -1542,8 +1520,6 @@ bool bio_attempt_front_merge(struct request_queue *q, struct request *req,
 
 	if (!ll_front_merge_fn(q, req, bio))
 		return false;
-
-	trace_block_bio_frontmerge(q, req, bio);
 
 	if ((req->cmd_flags & REQ_FAILFAST_MASK) != ff)
 		blk_rq_set_mixed_merge(req);
@@ -1776,12 +1752,9 @@ get_rq:
 		 * If this is the first request added after a plug, fire
 		 * of a plug trace.
 		 */
-		if (!request_count)
-			trace_block_plug(q);
-		else {
+		if (!request_count) {
 			if (request_count >= BLK_MAX_REQUEST_COUNT) {
 				blk_flush_plug_list(plug, false);
-				trace_block_plug(q);
 			}
 		}
 		list_add_tail(&req->queuelist, &plug->list);
@@ -1810,9 +1783,6 @@ static inline void blk_partition_remap(struct bio *bio)
 		bio->bi_iter.bi_sector += p->start_sect;
 		bio->bi_bdev = bdev->bd_contains;
 
-		trace_block_bio_remap(bdev_get_queue(bio->bi_bdev), bio,
-				      bdev->bd_dev,
-				      bio->bi_iter.bi_sector - p->start_sect);
 	}
 }
 
@@ -1973,7 +1943,6 @@ generic_make_request_checks(struct bio *bio)
 	if (!blkcg_bio_issue_check(q, bio))
 		return false;
 
-	trace_block_bio_queue(q, bio);
 	return true;
 
 not_supported:
@@ -2105,10 +2074,9 @@ EXPORT_SYMBOL(generic_make_request);
  */
 blk_qc_t submit_bio(struct bio *bio)
 {
+	bool workingset_read = false;
+	unsigned long pflags;
 	blk_qc_t ret;
-	u64 s_running_time, s_runnable_time;
-	unsigned long s_total_time;
-	unsigned int delta;
 
 	/*
 	 * If it's a regular read/write or a barrier with data attached,
@@ -2155,21 +2123,6 @@ blk_qc_t submit_bio(struct bio *bio)
 
 	if (workingset_read)
 		psi_memstall_leave(&pflags);
-
-	s_total_time = jiffies;
-	s_running_time = current->se.sum_exec_runtime;
-	s_runnable_time = current->sched_info.run_delay;
-	ret = generic_make_request(bio);
-	if (IO_SHOW_LOG) {
-		delta = jiffies_to_msecs(jiffies - s_total_time);
-		if (delta > IO_BLK_SUBMIT_BIO_LEVEL) {
-			pr_info("Slow IO BLK|Submit_bio:  %d(%s) prio(%d|%d), total_time(%dms) running_time(%lluns) runnable(%lluns)\n",
-				current->pid, current->comm,
-				current->policy, current->prio, delta,
-				current->se.sum_exec_runtime - s_running_time,
-				current->sched_info.run_delay - s_runnable_time);
-		}
-	}
 
 	return ret;
 }
@@ -2447,7 +2400,6 @@ struct request *blk_peek_request(struct request_queue *q)
 			 * not be passed by new incoming requests
 			 */
 			rq->cmd_flags |= REQ_STARTED;
-			trace_block_rq_issue(q, rq);
 		}
 
 		if (!q->boundary_rq || q->boundary_rq == rq) {
@@ -2530,10 +2482,6 @@ void blk_dequeue_request(struct request *rq)
 		q->in_flight[rq_is_sync(rq)]++;
 		set_io_start_time_ns(rq);
 	}
-
-	#ifdef CONFIG_BLK_CGROUP
-	set_io_start_time_ns(rq);
-	#endif
 }
 
 /**
@@ -2618,8 +2566,6 @@ EXPORT_SYMBOL(blk_fetch_request);
 bool blk_update_request(struct request *req, int error, unsigned int nr_bytes)
 {
 	int total_bytes;
-
-	trace_block_rq_complete(req->q, req, nr_bytes);
 
 	if (!req->bio)
 		return false;
@@ -3267,8 +3213,6 @@ static void queue_unplugged(struct request_queue *q, unsigned int depth,
 			    bool from_schedule)
 	__releases(q->queue_lock)
 {
-	trace_block_unplug(q, depth, !from_schedule);
-
 	if (from_schedule)
 		blk_run_queue_async(q);
 	else
@@ -3399,7 +3343,7 @@ void blk_finish_plug(struct blk_plug *plug)
 }
 EXPORT_SYMBOL(blk_finish_plug);
 
-bool blk_poll(struct request_queue *q, blk_qc_t cookie, struct bio *bio)
+bool blk_poll(struct request_queue *q, blk_qc_t cookie)
 {
 	struct blk_plug *plug;
 	long state;
@@ -3407,7 +3351,7 @@ bool blk_poll(struct request_queue *q, blk_qc_t cookie, struct bio *bio)
 	struct blk_mq_hw_ctx *hctx;
 
 	if (!q->mq_ops || !q->mq_ops->poll || !blk_qc_t_valid(cookie) ||
-	    !bio || !test_bit(QUEUE_FLAG_POLL, &q->queue_flags))
+	    !test_bit(QUEUE_FLAG_POLL, &q->queue_flags))
 		return false;
 
 	queue_num = blk_qc_t_to_queue_num(cookie);
@@ -3423,7 +3367,8 @@ bool blk_poll(struct request_queue *q, blk_qc_t cookie, struct bio *bio)
 		int ret;
 
 		hctx->poll_invoked++;
-		ret = q->mq_ops->poll(hctx, blk_qc_t_to_tag(cookie), bio);
+
+		ret = q->mq_ops->poll(hctx, blk_qc_t_to_tag(cookie));
 		if (ret > 0) {
 			hctx->poll_success++;
 			set_current_state(TASK_RUNNING);
@@ -3443,32 +3388,6 @@ bool blk_poll(struct request_queue *q, blk_qc_t cookie, struct bio *bio)
 	return false;
 }
 EXPORT_SYMBOL_GPL(blk_poll);
-
-void blk_set_bio_status(struct request *rq, unsigned int status)
-{
-	struct bio *bio;
-	for (bio = rq->bio; bio; bio = bio->bi_next) {
-		bio->bi_status = status;
-	}
-}
-EXPORT_SYMBOL_GPL(blk_set_bio_status);
-
-bool blk_request_is_polling(struct request *rq)
-{
-	bool polling = false;
-	struct bio *bio;
-	for (bio = rq->bio; bio; bio = bio->bi_next) {
-		if (bio->bi_polling == true)
-			polling = true;
-	}
-	return polling;
-}
-
-void blk_request_set_polling(struct request *rq, bool polling) {
-	struct bio *bio;
-	for (bio = rq->bio; bio; bio = bio->bi_next)
-		bio->bi_polling = polling;
-}
 
 #ifdef CONFIG_PM
 /**
@@ -3656,7 +3575,8 @@ int __init blk_dev_init(void)
 
 	/* used for unplugging and affects IO latency/throughput - HIGHPRI */
 	kblockd_workqueue = alloc_workqueue("kblockd",
-					    WQ_MEM_RECLAIM | WQ_HIGHPRI, 0);
+					    WQ_MEM_RECLAIM | WQ_HIGHPRI |
+					    WQ_POWER_EFFICIENT, 0);
 	if (!kblockd_workqueue)
 		panic("Failed to create kblockd\n");
 

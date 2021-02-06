@@ -36,7 +36,6 @@
 
 #include <linux/uaccess.h>
 
-
 /*
  * This supports access to SPI devices using normal userspace I/O calls.
  * Note that while traditional UNIX/POSIX I/O semantics are half duplex,
@@ -91,10 +90,8 @@ static LIST_HEAD(device_list);
 static DEFINE_MUTEX(device_list_lock);
 
 static unsigned bufsiz = 4096;
-module_param(bufsiz, uint, S_IRUGO);
+module_param(bufsiz, uint, 0);
 MODULE_PARM_DESC(bufsiz, "data bytes in biggest supported SPI message");
-
-/*-------------------------------------------------------------------------*/
 
 static ssize_t
 spidev_sync(struct spidev_data *spidev, struct spi_message *message)

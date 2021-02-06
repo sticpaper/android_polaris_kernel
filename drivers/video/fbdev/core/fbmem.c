@@ -35,7 +35,6 @@
 
 #include <asm/fb.h>
 
-
     /*
      *  Frame buffer device initialization and setup routines
      */
@@ -1624,7 +1623,7 @@ static int do_remove_conflicting_framebuffers(struct apertures_struct *a,
 }
 
 static bool lockless_register_fb;
-module_param_named_unsafe(lockless_register_fb, lockless_register_fb, bool, 0400);
+module_param_named_unsafe(lockless_register_fb, lockless_register_fb, bool, 0);
 MODULE_PARM_DESC(lockless_register_fb,
 	"Lockless framebuffer registration for debugging [default=off]");
 

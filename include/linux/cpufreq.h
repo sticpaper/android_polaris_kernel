@@ -2,7 +2,6 @@
  * linux/include/linux/cpufreq.h
  *
  * Copyright (C) 2001 Russell King
- * Copyright (C) 2019 XiaoMi, Inc.
  *           (C) 2002 - 2003 Dominik Brodowski <linux@brodo.de>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -133,7 +132,7 @@ struct cpufreq_policy {
 
 	/* cpufreq-stats */
 	struct cpufreq_stats	*stats;
-	struct cpufreq_stats	*gov_stats;
+
 	/* For cpufreq driver's internal use */
 	void			*driver_data;
 };
@@ -202,21 +201,12 @@ static inline void disable_cpufreq(void) { }
 void cpufreq_stats_create_table(struct cpufreq_policy *policy);
 void cpufreq_stats_free_table(struct cpufreq_policy *policy);
 void cpufreq_stats_record_transition(struct cpufreq_policy *policy,
-					unsigned int new_freq);
-void cpufreq_gov_stats_create_table(struct cpufreq_policy *policy);
-void cpufreq_gov_stats_free_table(struct cpufreq_policy *policy);
-void cpufreq_gov_stats_record_transition(struct cpufreq_policy *policy,
-					unsigned int new_freq);
+				     unsigned int new_freq);
 #else
 static inline void cpufreq_stats_create_table(struct cpufreq_policy *policy) { }
 static inline void cpufreq_stats_free_table(struct cpufreq_policy *policy) { }
 static inline void cpufreq_stats_record_transition(struct cpufreq_policy *policy,
 						   unsigned int new_freq) { }
-static inline void cpufreq_gov_stats_create_table(struct cpufreq_policy *policy) { }
-static inline void cpufreq_gov_stats_free_table(struct cpufreq_policy *policy) { }
-static inline void cpufreq_gov_stats_record_transition(struct cpufreq_policy *policy,
-						   unsigned int new_freq) { }
-
 #endif /* CONFIG_CPU_FREQ_STAT */
 
 /*********************************************************************
@@ -556,6 +546,19 @@ static inline void cpufreq_policy_apply_limits(struct cpufreq_policy *policy)
 		__cpufreq_driver_target(policy, policy->max, CPUFREQ_RELATION_H);
 	else if (policy->min > policy->cur)
 		__cpufreq_driver_target(policy, policy->min, CPUFREQ_RELATION_L);
+}
+
+static inline unsigned int
+cpufreq_policy_apply_limits_fast(struct cpufreq_policy *policy)
+{
+	unsigned int ret = 0;
+
+	if (policy->max < policy->cur)
+		ret = cpufreq_driver_fast_switch(policy, policy->max);
+	else if (policy->min > policy->cur)
+		ret = cpufreq_driver_fast_switch(policy, policy->min);
+
+	return ret;
 }
 
 /* Governor attribute set */
@@ -942,6 +945,9 @@ unsigned int cpufreq_generic_get(unsigned int cpu);
 int cpufreq_generic_init(struct cpufreq_policy *policy,
 		struct cpufreq_frequency_table *table,
 		unsigned int transition_latency);
+
+void scale_freq_capacity(const cpumask_t *cpus, unsigned long cur_freq,
+			 unsigned long max_freq);
 
 struct sched_domain;
 unsigned long cpufreq_scale_freq_capacity(struct sched_domain *sd, int cpu);

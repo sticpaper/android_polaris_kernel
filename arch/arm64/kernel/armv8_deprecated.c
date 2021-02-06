@@ -375,6 +375,7 @@ static unsigned int __kprobes aarch32_check_condition(u32 opcode, u32 psr)
 static int swp_handler(struct pt_regs *regs, u32 instr)
 {
 	u32 destreg, data, type, address = 0;
+	const void __user *user_ptr;
 	int rn, rt2, res = 0;
 
 	perf_sw_event(PERF_COUNT_SW_EMULATION_FAULTS, 1, regs, regs->pc);
@@ -406,7 +407,8 @@ static int swp_handler(struct pt_regs *regs, u32 instr)
 		aarch32_insn_extract_reg_num(instr, A32_RT2_OFFSET), data);
 
 	/* Check access in reasonable access range for both SWP and SWPB */
-	if (!access_ok(VERIFY_WRITE, (address & ~3), 4)) {
+	user_ptr = (const void __user *)(unsigned long)(address & ~3);
+	if (!access_ok(VERIFY_WRITE, user_ptr, 4)) {
 		pr_debug("SWP{B} emulation: access to 0x%08x not allowed!\n",
 			address);
 		goto fault;
@@ -505,8 +507,6 @@ static int cp15barrier_handler(struct pt_regs *regs, u32 instr)
 	}
 
 ret:
-	pr_warn_ratelimited("\"%s\" (%ld) uses deprecated CP15 Barrier instruction at 0x%llx\n",
-			current->comm, (unsigned long)current->pid, regs->pc);
 
 	regs->pc += 4;
 	return 0;
@@ -573,8 +573,6 @@ static int compat_setend_handler(struct pt_regs *regs, u32 big_endian)
 	}
 
 	trace_instruction_emulation(insn, regs->pc);
-	pr_warn_ratelimited("\"%s\" (%ld) uses deprecated setend instruction at 0x%llx\n",
-			current->comm, (unsigned long)current->pid, regs->pc);
 
 	return 0;
 }

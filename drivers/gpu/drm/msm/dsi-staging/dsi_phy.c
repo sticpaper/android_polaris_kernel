@@ -110,15 +110,11 @@ static int dsi_phy_regmap_init(struct platform_device *pdev,
 	ptr = msm_ioremap(pdev, "dyn_refresh_base", phy->name);
 	phy->hw.dyn_pll_base = ptr;
 
-	pr_debug("[%s] map dsi_phy registers to %pK\n",
-		phy->name, phy->hw.base);
-
 	return rc;
 }
 
 static int dsi_phy_regmap_deinit(struct msm_dsi_phy *phy)
 {
-	pr_debug("[%s] unmap registers\n", phy->name);
 	return 0;
 }
 
@@ -297,8 +293,7 @@ static int dsi_phy_settings_init(struct platform_device *pdev,
 	/* Actual timing values are dependent on panel */
 	timing->count_per_lane = phy->ver_info->timing_cfg_count;
 
-	phy->allow_phy_power_off = of_property_read_bool(pdev->dev.of_node,
-			"qcom,panel-allow-phy-poweroff");
+	phy->allow_phy_power_off = true;
 
 	of_property_read_u32(pdev->dev.of_node,
 			"qcom,dsi-phy-regulator-min-datarate-bps",
@@ -364,8 +359,6 @@ static int dsi_phy_driver_probe(struct platform_device *pdev)
 	dsi_phy->name = of_get_property(pdev->dev.of_node, "label", NULL);
 	if (!dsi_phy->name)
 		dsi_phy->name = DSI_PHY_DEFAULT_LABEL;
-
-	pr_debug("Probing %s device\n", dsi_phy->name);
 
 	rc = dsi_phy_regmap_init(pdev, dsi_phy);
 	if (rc) {
@@ -619,8 +612,6 @@ int dsi_phy_validate_mode(struct msm_dsi_phy *dsi_phy,
 		return -EINVAL;
 	}
 
-	pr_debug("[PHY_%d] Skipping validation\n", dsi_phy->index);
-
 	return rc;
 }
 
@@ -797,7 +788,6 @@ int dsi_phy_set_ulps(struct msm_dsi_phy *phy, struct dsi_host_config *config,
 			phy->index, enable, rc);
 		goto error;
 	}
-	pr_debug("[DSI_PHY%d] ULPS state = %d\n", phy->index, enable);
 
 error:
 	mutex_unlock(&phy->phy_lock);
@@ -939,8 +929,6 @@ int dsi_phy_set_clamp_state(struct msm_dsi_phy *phy, bool enable)
 	if (!phy)
 		return -EINVAL;
 
-	pr_debug("[%s] enable=%d\n", phy->name, enable);
-
 	if (phy->hw.ops.clamp_ctrl)
 		phy->hw.ops.clamp_ctrl(&phy->hw, enable);
 
@@ -961,8 +949,6 @@ int dsi_phy_idle_ctrl(struct msm_dsi_phy *phy, bool enable)
 		pr_err("Invalid params\n");
 		return -EINVAL;
 	}
-
-	pr_debug("[%s] enable=%d\n", phy->name, enable);
 
 	mutex_lock(&phy->phy_lock);
 	if (enable) {
@@ -1017,11 +1003,6 @@ int dsi_phy_set_clk_freq(struct msm_dsi_phy *phy,
 	 * votes go through RPM to enable regulators.
 	 */
 	phy->regulator_required = true;
-	pr_debug("[%s] lane_datarate=%u min_datarate=%u required=%d\n",
-			phy->name,
-			clk_freq->byte_clk_rate * BITS_PER_BYTE,
-			phy->regulator_min_datarate_bps,
-			phy->regulator_required);
 
 	return 0;
 }

@@ -61,6 +61,12 @@ zeroones	.req	x10
 pos		.req	x11
 
 ENTRY(strcmp)
+	prfm    pldl1strm, [src1]
+	prfm    pldl1strm, [src2]
+	b	.Lperf_critical
+.align  6
+.Lperf_critical:
+	/* Start of performance-critical section  -- one 64B cache line.  */
 	eor	tmp1, src1, src2
 	mov	zeroones, #REP8_01
 	tst	tmp1, #7
@@ -77,6 +83,8 @@ ENTRY(strcmp)
 	ldr	data1, [src1], #8
 	ldr	data2, [src2], #8
 .Lstart_realigned:
+	prfm    pldl1strm, [src1]
+	prfm    pldl1strm, [src2]
 	sub	tmp1, data1, zeroones
 	orr	tmp2, data1, #REP8_7f
 	eor	diff, data1, data2	/* Non-zero if differences found.  */
@@ -198,7 +206,7 @@ CPU_LE( rev	data2, data2 )
 	* as carry-propagation can corrupt the upper bits if the trailing
 	* bytes in the string contain 0x01.
 	* However, if there is no NUL byte in the dword, we can generate
-	* the result directly.  We ca not just subtract the bytes as the
+	* the result directly.  We cannot just subtract the bytes as the
 	* MSB might be significant.
 	*/
 CPU_BE( cbnz	has_nul, 1f )

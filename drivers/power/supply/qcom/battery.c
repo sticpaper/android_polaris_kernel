@@ -1,5 +1,5 @@
 /* Copyright (c) 2018,2019 The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -107,7 +107,7 @@ enum {
 };
 
 static int debug_mask;
-module_param_named(debug_mask, debug_mask, int, 0600);
+module_param_named(debug_mask, debug_mask, int, 0);
 
 #define pl_dbg(chip, reason, fmt, ...)				\
 	do {								\
@@ -1213,6 +1213,13 @@ static int pl_disable_vote_callback(struct votable *votable,
 		cancel_delayed_work_sync(&chip->pl_awake_work);
 		schedule_delayed_work(&chip->pl_awake_work,
 						msecs_to_jiffies(5000));
+	}
+
+	/* notify parallel state change */
+	if (chip->pl_psy && (chip->pl_disable != pl_disable)
+				&& !chip->fcc_stepper_enable) {
+		power_supply_changed(chip->pl_psy);
+		chip->pl_disable = (bool)pl_disable;
 	}
 
 	pl_dbg(chip, PR_PARALLEL, "parallel charging %s\n",

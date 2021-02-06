@@ -1,6 +1,5 @@
 /*
 * Copyright (C) 2012 Texas Instruments
-* Copyright (C) 2019 XiaoMi, Inc.
 *
 * License Terms: GNU General Public License v2
 *

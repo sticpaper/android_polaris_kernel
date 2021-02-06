@@ -382,16 +382,10 @@ static void __blk_mq_complete_request(struct request *rq)
 {
 	struct request_queue *q = rq->q;
 
-	blk_set_bio_status(rq, BIO_HALF_SUCCESS);
-
 	if (!q->softirq_done_fn)
 		blk_mq_end_request(rq, rq->errors);
-	else {
-		if (likely(!blk_request_is_polling(rq)))
-			blk_mq_ipi_complete_request(rq);
-		else
-			q->softirq_done_fn(rq);
-	}
+	else
+		blk_mq_ipi_complete_request(rq);
 }
 
 /**
@@ -424,8 +418,6 @@ EXPORT_SYMBOL_GPL(blk_mq_request_started);
 void blk_mq_start_request(struct request *rq)
 {
 	struct request_queue *q = rq->q;
-
-	trace_block_rq_issue(q, rq);
 
 	rq->resid_len = blk_rq_bytes(rq);
 	if (unlikely(blk_bidi_rq(rq)))
@@ -464,8 +456,6 @@ EXPORT_SYMBOL(blk_mq_start_request);
 static void __blk_mq_requeue_request(struct request *rq)
 {
 	struct request_queue *q = rq->q;
-
-	trace_block_rq_requeue(q, rq);
 
 	if (test_and_clear_bit(REQ_ATOM_STARTED, &rq->atomic_flags)) {
 		if (q->dma_drain_size && blk_rq_bytes(rq))
@@ -1027,8 +1017,6 @@ static inline void __blk_mq_insert_req_list(struct blk_mq_hw_ctx *hctx,
 {
 	struct blk_mq_ctx *ctx = rq->mq_ctx;
 
-	trace_block_rq_insert(hctx->queue, rq);
-
 	if (at_head)
 		list_add(&rq->queuelist, &ctx->rq_list);
 	else
@@ -1067,8 +1055,6 @@ static void blk_mq_insert_requests(struct request_queue *q,
 
 {
 	struct blk_mq_hw_ctx *hctx = blk_mq_map_queue(q, ctx->cpu);
-
-	trace_block_unplug(q, depth, !from_schedule);
 
 	/*
 	 * preemption doesn't flush plug list, so it's possible ctx->cpu is
@@ -1208,7 +1194,6 @@ static struct request *blk_mq_map_request(struct request_queue *q,
 	if (rw_is_sync(bio_op(bio), bio->bi_opf))
 		op_flags |= REQ_SYNC;
 
-	trace_block_getrq(q, bio, op);
 	blk_mq_set_alloc_data(&alloc_data, q, 0, ctx, hctx);
 	rq = __blk_mq_alloc_request(&alloc_data, op, op_flags);
 
@@ -1397,14 +1382,10 @@ static blk_qc_t blk_sq_make_request(struct request_queue *q, struct bio *bio)
 	plug = current->plug;
 	if (plug) {
 		blk_mq_bio_to_request(rq, bio);
-		if (!request_count)
-			trace_block_plug(q);
-
 		blk_mq_put_ctx(data.ctx);
 
 		if (request_count >= BLK_MAX_REQUEST_COUNT) {
 			blk_flush_plug_list(plug, false);
-			trace_block_plug(q);
 		}
 
 		list_add_tail(&rq->queuelist, &plug->mq_list);

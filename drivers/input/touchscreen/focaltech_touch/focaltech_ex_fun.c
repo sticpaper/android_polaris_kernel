@@ -3,7 +3,7 @@
  * FocalTech TouchScreen driver.
  *
  * Copyright (c) 2010-2017, Focaltech Ltd. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -145,7 +145,7 @@ static ssize_t fts_debug_write(struct file *filp, const char __user *buff, size_
 		break;
 
 	case PROC_HW_RESET:
-		snprintf(tmp, PAGE_SIZE, "%s", writebuf + 1);
+		snprintf(tmp, sizeof(tmp), "%s", writebuf + 1);
 		tmp[buflen - 1] = '\0';
 		if (strncmp(tmp, "focal_driver", 12) == 0) {
 			FTS_INFO("APK execute HW Reset");
@@ -815,7 +815,7 @@ static ssize_t fts_fwupgradebin_store(struct device *dev, struct device_attribut
 		return -EINVAL;
 	}
 	memset(fwname, 0, sizeof(fwname));
-	snprintf(fwname, PAGE_SIZE, "%s", buf);
+	snprintf(fwname, sizeof(fwname), "%s", buf);
 	fwname[count - 1] = '\0';
 
 	FTS_INFO("upgrade with bin file through sysfs node");
@@ -858,7 +858,7 @@ static ssize_t fts_fwforceupg_store(struct device *dev, struct device_attribute 
 		return -EINVAL;
 	}
 	memset(fwname, 0, sizeof(fwname));
-	snprintf(fwname, PAGE_SIZE, "%s", buf);
+	snprintf(fwname, sizeof(fwname), "%s", buf);
 	fwname[count - 1] = '\0';
 
 	FTS_INFO("force upgrade through sysfs node");

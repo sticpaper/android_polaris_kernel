@@ -1865,8 +1865,6 @@ static void uvc_unregister_video(struct uvc_device *dev)
 			continue;
 
 		video_unregister_device(&stream->vdev);
-
-		uvc_debugfs_cleanup_stream(stream);
 	}
 
 	/* Decrement the stream count and call uvc_delete explicitly if there
@@ -1896,8 +1894,6 @@ static int uvc_register_video(struct uvc_device *dev,
 			"(%d).\n", ret);
 		return ret;
 	}
-
-	uvc_debugfs_init_stream(stream);
 
 	/* Register the device with V4L. */
 
@@ -2717,11 +2713,8 @@ static int __init uvc_init(void)
 {
 	int ret;
 
-	uvc_debugfs_init();
-
 	ret = usb_register(&uvc_driver.driver);
 	if (ret < 0) {
-		uvc_debugfs_cleanup();
 		return ret;
 	}
 
@@ -2732,7 +2725,6 @@ static int __init uvc_init(void)
 static void __exit uvc_cleanup(void)
 {
 	usb_deregister(&uvc_driver.driver);
-	uvc_debugfs_cleanup();
 }
 
 module_init(uvc_init);

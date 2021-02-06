@@ -4,7 +4,6 @@
  * Written by Stephen C. Tweedie <sct@redhat.com>, 1998
  *
  * Copyright 1998 Red Hat corp --- All Rights Reserved
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This file is part of the Linux kernel and is made available under
  * the terms of the GNU General Public License, version 2, or at your
@@ -28,7 +27,6 @@
 #include <linux/bio.h>
 #include <linux/blkdev.h>
 #include <linux/bitops.h>
-#include <linux/mi_io.h>
 #include <trace/events/jbd2.h>
 
 /*
@@ -236,7 +234,6 @@ static int journal_submit_data_buffers(journal_t *journal,
 		 * block allocation  with delalloc. We need to write
 		 * only allocated blocks here.
 		 */
-		trace_jbd2_submit_inode_data(jinode->i_vfs_inode);
 		err = journal_submit_inode_data_buffers(mapping, dirty_start,
 				dirty_end);
 		if (!ret)
@@ -402,10 +399,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	int csum_size = 0;
 	LIST_HEAD(io_bufs);
 	LIST_HEAD(log_bufs);
-	unsigned long s_total_time;
-	u64 s_running_time, s_runnable_time;
-	unsigned int delta;
-	unsigned long commit_latency;
 
 	if (jbd2_journal_has_csum_v2or3(journal))
 		csum_size = sizeof(struct jbd2_journal_block_tail);
@@ -417,7 +410,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 
 	/* Do we need to erase the effects of a prior jbd2_journal_flush? */
 	if (journal->j_flags & JBD2_FLUSHED) {
-		jbd_debug(3, "super block updated\n");
 		mutex_lock(&journal->j_checkpoint_mutex);
 		/*
 		 * We hold j_checkpoint_mutex so tail cannot change under us.
@@ -430,8 +422,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 						journal->j_tail,
 						WRITE_SYNC);
 		mutex_unlock(&journal->j_checkpoint_mutex);
-	} else {
-		jbd_debug(3, "superblock not updated\n");
 	}
 
 	J_ASSERT(journal->j_running_transaction != NULL);
@@ -439,15 +429,10 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 
 	commit_transaction = journal->j_running_transaction;
 
-	trace_jbd2_start_commit(journal, commit_transaction);
-	jbd_debug(1, "JBD2: starting commit of transaction %d\n",
-			commit_transaction->t_tid);
-
 	write_lock(&journal->j_state_lock);
 	J_ASSERT(commit_transaction->t_state == T_RUNNING);
 	commit_transaction->t_state = T_LOCKED;
 
-	trace_jbd2_commit_locking(journal, commit_transaction);
 	stats.run.rs_wait = commit_transaction->t_max_wait;
 	stats.run.rs_request_delay = 0;
 	stats.run.rs_locked = jiffies;
@@ -458,9 +443,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	stats.run.rs_running = jbd2_time_diff(commit_transaction->t_start,
 					      stats.run.rs_locked);
 
-	s_total_time = jiffies;
-	s_running_time = current->se.sum_exec_runtime;
-	s_runnable_time = current->sched_info.run_delay;
 	spin_lock(&commit_transaction->t_handle_lock);
 	while (atomic_read(&commit_transaction->t_updates)) {
 		DEFINE_WAIT(wait);
@@ -477,15 +459,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 		finish_wait(&journal->j_wait_updates, &wait);
 	}
 	spin_unlock(&commit_transaction->t_handle_lock);
-	if (IO_SHOW_LOG) {
-		delta = jiffies_to_msecs(jiffies - s_total_time);
-		if (delta > IO_JBD2_LEVEL)
-			pr_info("Slow IO Jbd2|j_wait_updates %d(%s) prio(%d|%d) time(%dms)\n",
-				current->pid, current->comm,
-				current->policy, current->prio,
-				delta);
-	}
-
 
 	J_ASSERT (atomic_read(&commit_transaction->t_outstanding_credits) <=
 			journal->j_max_transaction_buffers);
@@ -533,8 +506,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	__jbd2_journal_clean_checkpoint_list(journal, false);
 	spin_unlock(&journal->j_list_lock);
 
-	jbd_debug(3, "JBD2: commit phase 1\n");
-
 	/*
 	 * Clear revoked flag to reflect there is no revoked buffers
 	 * in the next transaction which is going to be started.
@@ -552,7 +523,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	atomic_sub(atomic_read(&journal->j_reserved_credits),
 		   &commit_transaction->t_outstanding_credits);
 
-	trace_jbd2_commit_flushing(journal, commit_transaction);
 	stats.run.rs_flushing = jiffies;
 	stats.run.rs_locked = jbd2_time_diff(stats.run.rs_locked,
 					     stats.run.rs_flushing);
@@ -565,8 +535,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	wake_up(&journal->j_wait_transaction_locked);
 	write_unlock(&journal->j_state_lock);
 
-	jbd_debug(3, "JBD2: commit phase 2a\n");
-
 	/*
 	 * Now start flushing things to disk, in the order they appear
 	 * on the transaction lists.  Data blocks go first.
@@ -578,8 +546,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	blk_start_plug(&plug);
 	jbd2_journal_write_revoke_records(commit_transaction, &log_bufs);
 
-	jbd_debug(3, "JBD2: commit phase 2b\n");
-
 	/*
 	 * Way to go: we have now written out all of the data for a
 	 * transaction!  Now comes the tricky part: we need to write out
@@ -589,7 +555,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 	commit_transaction->t_state = T_COMMIT;
 	write_unlock(&journal->j_state_lock);
 
-	trace_jbd2_commit_logging(journal, commit_transaction);
 	stats.run.rs_logging = jiffies;
 	stats.run.rs_flushing = jbd2_time_diff(stats.run.rs_flushing,
 					       stats.run.rs_logging);
@@ -635,8 +600,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 		if (!descriptor) {
 			J_ASSERT (bufs == 0);
 
-			jbd_debug(4, "JBD2: get descriptor\n");
-
 			descriptor = jbd2_journal_get_descriptor_buffer(
 							commit_transaction,
 							JBD2_DESCRIPTOR_BLOCK);
@@ -645,9 +608,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 				continue;
 			}
 
-			jbd_debug(4, "JBD2: got buffer %llu (%p)\n",
-				(unsigned long long)descriptor->b_blocknr,
-				descriptor->b_data);
 			tagp = &descriptor->b_data[sizeof(journal_header_t)];
 			space_left = descriptor->b_size -
 						sizeof(journal_header_t);
@@ -731,8 +691,6 @@ void jbd2_journal_commit_transaction(journal_t *journal)
 		    commit_transaction->t_buffers == NULL ||
 		    space_left < tag_bytes + 16 + csum_size) {
 
-			jbd_debug(4, "JBD2: Submit %d IOs\n", bufs);
-
 			/* Write an end-of-descriptor marker before
                            submitting the IOs.  "tag" still points to
                            the last tag we set up. */
@@ -801,9 +759,6 @@ start_journal_io:
 	J_ASSERT(commit_transaction->t_state == T_COMMIT);
 	commit_transaction->t_state = T_COMMIT_DFLUSH;
 	write_unlock(&journal->j_state_lock);
-	stats.run.rs_metadata_flushed = jiffies;
-	stats.run.rs_data_flushed = jbd2_time_diff(stats.run.rs_logging,
-					       stats.run.rs_metadata_flushed);
 
 	/* 
 	 * If the journal is not located on the file system device,
@@ -835,8 +790,6 @@ start_journal_io:
 	   less likely to be woken up until all IOs have completed, and
 	   so we incur less scheduling load.
 	*/
-
-	jbd_debug(3, "JBD2: commit phase 3\n");
 
 	while (!list_empty(&io_bufs)) {
 		struct buffer_head *bh = list_entry(io_bufs.prev,
@@ -879,8 +832,6 @@ start_journal_io:
 
 	J_ASSERT (commit_transaction->t_shadow_list == NULL);
 
-	jbd_debug(3, "JBD2: commit phase 4\n");
-
 	/* Here we wait for the revoke record and descriptor record buffers */
 	while (!list_empty(&log_bufs)) {
 		struct buffer_head *bh;
@@ -903,14 +854,10 @@ start_journal_io:
 	if (err)
 		jbd2_journal_abort(journal, err);
 
-	jbd_debug(3, "JBD2: commit phase 5\n");
 	write_lock(&journal->j_state_lock);
 	J_ASSERT(commit_transaction->t_state == T_COMMIT_DFLUSH);
 	commit_transaction->t_state = T_COMMIT_JFLUSH;
 	write_unlock(&journal->j_state_lock);
-	stats.run.rs_committing = jiffies;
-	stats.run.rs_metadata_flushed = jbd2_time_diff(stats.run.rs_metadata_flushed,
-					       stats.run.rs_committing);
 
 	if (!jbd2_has_feature_async_commit(journal)) {
 		err = journal_submit_commit_record(journal, commit_transaction,
@@ -942,15 +889,10 @@ start_journal_io:
            transaction can be removed from any checkpoint list it was on
            before. */
 
-	jbd_debug(3, "JBD2: commit phase 6\n");
-
 	J_ASSERT(list_empty(&commit_transaction->t_inode_list));
 	J_ASSERT(commit_transaction->t_buffers == NULL);
 	J_ASSERT(commit_transaction->t_checkpoint_list == NULL);
 	J_ASSERT(commit_transaction->t_shadow_list == NULL);
-
-	stats.run.rs_committing = jbd2_time_diff(stats.run.rs_committing,
-					      jiffies);
 
 restart_loop:
 	/*
@@ -1119,8 +1061,6 @@ restart_loop:
 
 	/* Done with this transaction! */
 
-	jbd_debug(3, "JBD2: commit phase 7\n");
-
 	J_ASSERT(commit_transaction->t_state == T_COMMIT_JFLUSH);
 
 	commit_transaction->t_start = jiffies;
@@ -1133,8 +1073,6 @@ restart_loop:
 	stats.ts_tid = commit_transaction->t_tid;
 	stats.run.rs_handle_count =
 		atomic_read(&commit_transaction->t_handle_count);
-	trace_jbd2_run_stats(journal->j_fs_dev->bd_dev,
-			     commit_transaction->t_tid, &stats.run);
 	stats.ts_requested = (commit_transaction->t_requested) ? 1 : 0;
 
 	commit_transaction->t_state = T_COMMIT_CALLBACK;
@@ -1155,15 +1093,8 @@ restart_loop:
 
 	write_unlock(&journal->j_state_lock);
 
-	stats.run.rs_callback = jiffies;
 	if (journal->j_commit_callback)
 		journal->j_commit_callback(journal, commit_transaction);
-	stats.run.rs_callback = jbd2_time_diff(stats.run.rs_callback,
-					      jiffies);
-
-	trace_jbd2_end_commit(journal, commit_transaction);
-	jbd_debug(1, "JBD2: commit %d complete, head %d\n",
-		  journal->j_commit_sequence, journal->j_tail_sequence);
 
 	write_lock(&journal->j_state_lock);
 	spin_lock(&journal->j_list_lock);
@@ -1177,48 +1108,6 @@ restart_loop:
 	spin_unlock(&journal->j_list_lock);
 	write_unlock(&journal->j_state_lock);
 	wake_up(&journal->j_wait_done_commit);
-	if (IO_SHOW_LOG) {
-		delta = jiffies_to_msecs(jiffies - s_total_time);
-		if (delta > IO_JBD2_LEVEL) {
-			pr_info("Slow IO Jbd2|daemon:  %d(%s) prio(%d|%d), total_time(%dms) running_time(%lluns) runnable(%lluns)\n",
-					current->pid, current->comm,
-					current->policy, current->prio, delta,
-					current->se.sum_exec_runtime - s_running_time,
-					current->sched_info.run_delay - s_runnable_time);
-		}
-	}
-
-
-	/*
-	 * Print detailed transaction commit time consuming info if it was requested
-	 */
-	if (stats.ts_requested) {
-		commit_latency = jbd2_time_diff(commit_transaction->t_requested, jiffies);
-		/*
-		 * Only print when latency more than 1s
-		 */
-		if (jiffies_to_msecs(commit_latency) > 1000)
-			printk(KERN_WARNING
-				"jbd2_journal_commit_transaction: commit_tid %d, commit_latency %u, wait %u, request_delay %u, "
-				"running %u, locked %u, flushing %u, data_flush %u, metadata_flush %u, logging %u, committing %u, "
-				"callback %u, handle_count %u, blocks %u, blocks_logged %u, write_inodes %u, wait_inodes %u",
-				commit_transaction->t_tid,
-				jiffies_to_msecs(commit_latency),
-				jiffies_to_msecs(stats.run.rs_wait),
-				jiffies_to_msecs(stats.run.rs_request_delay),
-				jiffies_to_msecs(stats.run.rs_running),
-				jiffies_to_msecs(stats.run.rs_locked),
-				jiffies_to_msecs(stats.run.rs_flushing),
-				jiffies_to_msecs(stats.run.rs_data_flushed),
-				jiffies_to_msecs(stats.run.rs_metadata_flushed),
-				jiffies_to_msecs(stats.run.rs_logging),
-				jiffies_to_msecs(stats.run.rs_committing),
-				jiffies_to_msecs(stats.run.rs_callback),
-				stats.run.rs_handle_count, stats.run.rs_blocks,
-				stats.run.rs_blocks_logged,
-				atomic_read(&commit_transaction->t_write_inodes),
-				atomic_read(&commit_transaction->t_wait_inodes));
-	}
 
 	/*
 	 * Calculate overall stats

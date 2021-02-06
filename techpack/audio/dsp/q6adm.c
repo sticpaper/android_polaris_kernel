@@ -615,7 +615,7 @@ int adm_programable_channel_mixer(int port_id, int copp_idx, int session_id,
 			ch_mixer->input_channels[channel_index] +
 			ch_mixer->input_channels[channel_index] *
 			ch_mixer->output_channel);
-	roundup(param_size, 4);
+	param_size = roundup(param_size, 4);
 
 	sz = sizeof(struct adm_cmd_set_pspd_mtmx_strtr_params_v5) +
 			sizeof(struct default_chmixer_param_id_coeff) +
@@ -2436,10 +2436,6 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 	int copp_idx = -1;
 	int tmp_port = q6audio_get_port_id(port_id);
 
-	pr_debug("%s:port %#x path:%d rate:%d mode:%d perf_mode:%d,topo_id %d\n",
-		 __func__, port_id, path, rate, channel_mode, perf_mode,
-		 topology);
-
 	port_id = q6audio_convert_virtual_to_portid(port_id);
 	port_idx = adm_validate_and_get_port_index(port_id);
 	if (port_idx < 0) {
@@ -2971,9 +2967,6 @@ int adm_close(int port_id, int perf_mode, int copp_idx)
 
 	int ret = 0, port_idx;
 	int copp_id = RESET_COPP_ID;
-
-	pr_debug("%s: port_id=0x%x perf_mode: %d copp_idx: %d\n", __func__,
-		 port_id, perf_mode, copp_idx);
 
 	port_id = q6audio_convert_virtual_to_portid(port_id);
 	port_idx = adm_validate_and_get_port_index(port_id);

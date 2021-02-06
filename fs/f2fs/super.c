@@ -883,18 +883,10 @@ static int f2fs_drop_inode(struct inode *inode)
 	if (unlikely(is_sbi_flag_set(sbi, SBI_CP_DISABLED))) {
 		if (inode->i_ino == F2FS_NODE_INO(sbi) ||
 			inode->i_ino == F2FS_META_INO(sbi)) {
-			trace_f2fs_drop_inode(inode, 1);
 			return 1;
 		}
 	}
 
-	/*
-	 * This is to avoid a deadlock condition like below.
-	 * writeback_single_inode(inode)
-	 *  - f2fs_write_data_page
-	 *    - f2fs_gc -> iput -> evict
-	 *       - inode_wait_for_writeback(inode)
-	 */
 	if ((!inode_unhashed(inode) && inode->i_state & I_SYNC)) {
 		if (!inode->i_nlink && !is_bad_inode(inode)) {
 			/* to avoid evict_inode call simultaneously */
@@ -923,11 +915,9 @@ static int f2fs_drop_inode(struct inode *inode)
 			spin_lock(&inode->i_lock);
 			atomic_dec(&inode->i_count);
 		}
-		trace_f2fs_drop_inode(inode, 0);
 		return 0;
 	}
 	ret = generic_drop_inode(inode);
-	trace_f2fs_drop_inode(inode, ret);
 	return ret;
 }
 
@@ -1088,6 +1078,7 @@ static void f2fs_put_super(struct super_block *sb)
 	 * above failed with error.
 	 */
 	f2fs_destroy_stats(sbi);
+	f2fs_gc_sbi_list_del(sbi);
 
 	/* destroy f2fs internal modules */
 	f2fs_destroy_node_manager(sbi);
@@ -1123,8 +1114,6 @@ int f2fs_sync_fs(struct super_block *sb, int sync)
 		return 0;
 	if (unlikely(is_sbi_flag_set(sbi, SBI_CP_DISABLED)))
 		return 0;
-
-	trace_f2fs_sync_fs(sb, sync);
 
 	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING)))
 		return -EAGAIN;
@@ -1435,7 +1424,6 @@ static void default_options(struct f2fs_sb_info *sbi)
 	F2FS_OPTION(sbi).s_resuid = make_kuid(&init_user_ns, F2FS_DEF_RESUID);
 	F2FS_OPTION(sbi).s_resgid = make_kgid(&init_user_ns, F2FS_DEF_RESGID);
 
-	set_opt(sbi, BG_GC);
 	set_opt(sbi, INLINE_XATTR);
 	set_opt(sbi, INLINE_DATA);
 	set_opt(sbi, INLINE_DENTRY);
@@ -3333,6 +3321,8 @@ try_onemore:
 		goto free_stats;
 	}
 
+	f2fs_gc_sbi_list_add(sbi);
+
 	/* read root inode and dentry */
 	root = f2fs_iget(sb, F2FS_ROOT_INO(sbi));
 	if (IS_ERR(root)) {
@@ -3485,6 +3475,7 @@ free_node_inode:
 	iput(sbi->node_inode);
 	sbi->node_inode = NULL;
 free_stats:
+	f2fs_gc_sbi_list_del(sbi);
 	f2fs_destroy_stats(sbi);
 free_nm:
 	f2fs_destroy_node_manager(sbi);
@@ -3624,6 +3615,8 @@ static int __init init_f2fs_fs(void)
 	err = f2fs_init_post_read_processing();
 	if (err)
 		goto free_root_stats;
+	f2fs_init_rapid_gc();
+
 	return 0;
 
 free_root_stats:
@@ -3649,6 +3642,7 @@ fail:
 
 static void __exit exit_f2fs_fs(void)
 {
+	f2fs_destroy_rapid_gc();
 	f2fs_destroy_post_read_processing();
 	f2fs_destroy_root_stats();
 	unregister_filesystem(&f2fs_fs_type);
@@ -3665,7 +3659,6 @@ static void __exit exit_f2fs_fs(void)
 module_init(init_f2fs_fs)
 module_exit(exit_f2fs_fs)
 
-MODULE_AUTHOR("Samsung Electronics's Praesto Team");
+MODULE_AUTHOR("Samsung Praesto Team");
 MODULE_DESCRIPTION("Flash Friendly File System");
 MODULE_LICENSE("GPL");
-

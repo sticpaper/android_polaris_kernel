@@ -46,7 +46,7 @@
 #define DRIVER_LICENSE "GPL"
 
 int hid_debug = 0;
-module_param_named(debug, hid_debug, int, 0600);
+module_param_named(debug, hid_debug, int, 0);
 MODULE_PARM_DESC(debug, "toggle HID debugging messages");
 EXPORT_SYMBOL_GPL(hid_debug);
 

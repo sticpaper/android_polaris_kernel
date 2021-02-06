@@ -29,7 +29,7 @@ MODULE_ALIAS_NFCT_HELPER("tftp");
 #define MAX_PORTS 8
 static unsigned short ports[MAX_PORTS];
 static unsigned int ports_c;
-module_param_array(ports, ushort, &ports_c, 0400);
+module_param_array(ports, ushort, &ports_c, 0);
 MODULE_PARM_DESC(ports, "Port numbers of TFTP servers");
 
 unsigned int (*nf_nat_tftp_hook)(struct sk_buff *skb,

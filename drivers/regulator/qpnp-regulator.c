@@ -45,7 +45,7 @@ enum {
 
 static int qpnp_vreg_debug_mask;
 module_param_named(
-	debug_mask, qpnp_vreg_debug_mask, int, 0600
+	debug_mask, qpnp_vreg_debug_mask, int, 0
 );
 
 #define vreg_err(vreg, fmt, ...) \

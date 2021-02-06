@@ -3,6 +3,7 @@
  * Android IPC Subsystem
  *
  * Copyright (C) 2007-2017 Google, Inc.
+ * Copyright (C) 2020 XiaoMi, Inc.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -45,7 +46,7 @@ enum {
 static uint32_t binder_alloc_debug_mask;
 
 module_param_named(debug_mask, binder_alloc_debug_mask,
-		   uint, 0644);
+		   uint, 0);
 
 #define binder_alloc_debug(mask, x...) \
 	do { \
@@ -83,10 +84,6 @@ static void binder_insert_free_buffer(struct binder_alloc *alloc,
 	BUG_ON(!new_buffer->free);
 
 	new_buffer_size = binder_alloc_buffer_size(alloc, new_buffer);
-
-	binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,
-		     "%d: add free buffer, size %zd, at %pK\n",
-		      alloc->pid, new_buffer_size, new_buffer);
 
 	while (*p) {
 		parent = *p;
@@ -194,14 +191,8 @@ static int binder_update_page_range(struct binder_alloc *alloc, int allocate,
 	struct mm_struct *mm = NULL;
 	bool need_mm = false;
 
-	binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,
-		     "%d: %s pages %pK-%pK\n", alloc->pid,
-		     allocate ? "allocate" : "free", start, end);
-
 	if (end <= start)
 		return 0;
-
-	trace_binder_update_page_range(alloc, allocate, start, end);
 
 	if (allocate == 0)
 		goto free_range;
@@ -242,19 +233,14 @@ static int binder_update_page_range(struct binder_alloc *alloc, int allocate,
 		page = &alloc->pages[index];
 
 		if (page->page_ptr) {
-			trace_binder_alloc_lru_start(alloc, index);
-
 			on_lru = list_lru_del(&binder_alloc_lru, &page->lru);
 			WARN_ON(!on_lru);
-
-			trace_binder_alloc_lru_end(alloc, index);
 			continue;
 		}
 
 		if (WARN_ON(!vma))
 			goto err_page_ptr_cleared;
 
-		trace_binder_alloc_page_start(alloc, index);
 		page->page_ptr = alloc_page(GFP_KERNEL |
 					    __GFP_HIGHMEM |
 					    __GFP_ZERO);
@@ -277,7 +263,6 @@ static int binder_update_page_range(struct binder_alloc *alloc, int allocate,
 		if (index + 1 > alloc->pages_high)
 			alloc->pages_high = index + 1;
 
-		trace_binder_alloc_page_end(alloc, index);
 		/* vm_insert_page does not seem to increment the refcount */
 	}
 	if (mm) {
@@ -295,12 +280,9 @@ free_range:
 		index = (page_addr - alloc->buffer) / PAGE_SIZE;
 		page = &alloc->pages[index];
 
-		trace_binder_free_lru_start(alloc, index);
-
 		ret = list_lru_add(&binder_alloc_lru, &page->lru);
 		WARN_ON(!ret);
 
-		trace_binder_free_lru_end(alloc, index);
 		continue;
 
 err_vm_insert_page_failed:
@@ -408,21 +390,13 @@ static struct binder_buffer *binder_alloc_new_buf_locked(
 			if (buffer_size > largest_free_size)
 				largest_free_size = buffer_size;
 		}
-		pr_err("%d: binder_alloc_buf size %zd failed, no address space\n",
-			alloc->pid, size);
-		pr_err("allocated: %zd (num: %zd largest: %zd), free: %zd (num: %zd largest: %zd)\n",
-		       total_alloc_size, allocated_buffers, largest_alloc_size,
-		       total_free_size, free_buffers, largest_free_size);
+
 		return ERR_PTR(-ENOSPC);
 	}
 	if (n == NULL) {
 		buffer = rb_entry(best_fit, struct binder_buffer, rb_node);
 		buffer_size = binder_alloc_buffer_size(alloc, buffer);
 	}
-
-	binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,
-		     "%d: binder_alloc_buf size %zd got buffer %pK size %zd\n",
-		      alloc->pid, size, buffer, buffer_size);
 
 	has_page_addr = (void __user *)
 		(((uintptr_t)buffer->user_data + buffer_size) & PAGE_MASK);
@@ -455,9 +429,6 @@ static struct binder_buffer *binder_alloc_new_buf_locked(
 	buffer->free = 0;
 	buffer->allow_user_free = 0;
 	binder_insert_allocated_buffer_locked(alloc, buffer);
-	binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,
-		     "%d: binder_alloc_buf size %zd got %pK\n",
-		      alloc->pid, size, buffer);
 	buffer->data_size = data_size;
 	buffer->offsets_size = offsets_size;
 	buffer->async_transaction = is_async;
@@ -528,21 +499,12 @@ static void binder_delete_free_buffer(struct binder_alloc *alloc,
 	BUG_ON(!prev->free);
 	if (prev_buffer_end_page(prev) == buffer_start_page(buffer)) {
 		to_free = false;
-		binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,
-				   "%d: merge free, buffer %pK share page with %pK\n",
-				   alloc->pid, buffer->user_data,
-				   prev->user_data);
 	}
 
 	if (!list_is_last(&buffer->entry, &alloc->buffers)) {
 		next = binder_buffer_next(buffer);
 		if (buffer_start_page(next) == buffer_start_page(buffer)) {
 			to_free = false;
-			binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,
-					   "%d: merge free, buffer %pK share page with %pK\n",
-					   alloc->pid,
-					   buffer->user_data,
-					   next->user_data);
 		}
 	}
 
@@ -554,11 +516,6 @@ static void binder_delete_free_buffer(struct binder_alloc *alloc,
 	}
 
 	if (to_free) {
-		binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,
-				   "%d: merge free, buffer %pK do not share page with %pK or %pK\n",
-				   alloc->pid, buffer->user_data,
-				   prev->user_data,
-				   next ? next->user_data : NULL);
 		binder_update_page_range(alloc, 0, buffer_start_page(buffer),
 					 buffer_start_page(buffer) + PAGE_SIZE);
 	}
@@ -577,10 +534,6 @@ static void binder_free_buf_locked(struct binder_alloc *alloc,
 		ALIGN(buffer->offsets_size, sizeof(void *)) +
 		ALIGN(buffer->extra_buffers_size, sizeof(void *));
 
-	binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC,
-		     "%d: binder_free_buf %pK size %zd buffer_size %zd\n",
-		      alloc->pid, buffer, size, buffer_size);
-
 	BUG_ON(buffer->free);
 	BUG_ON(size > buffer_size);
 	BUG_ON(buffer->transaction != NULL);
@@ -589,10 +542,6 @@ static void binder_free_buf_locked(struct binder_alloc *alloc,
 
 	if (buffer->async_transaction) {
 		alloc->free_async_space += size + sizeof(struct binder_buffer);
-
-		binder_alloc_debug(BINDER_DEBUG_BUFFER_ALLOC_ASYNC,
-			     "%d: binder_free_buf size %zd async free %zd\n",
-			      alloc->pid, size, alloc->free_async_space);
 	}
 
 	binder_update_page_range(alloc, 0,
@@ -705,8 +654,6 @@ err_alloc_pages_failed:
 	alloc->buffer = NULL;
 err_already_mapped:
 	mutex_unlock(&binder_alloc_mmap_lock);
-	pr_err("%s: %d %lx-%lx %s failed %d\n", __func__,
-	       alloc->pid, vma->vm_start, vma->vm_end, failure_string, ret);
 	return ret;
 }
 
@@ -767,10 +714,6 @@ void binder_alloc_deferred_release(struct binder_alloc *alloc)
 	mutex_unlock(&alloc->mutex);
 	if (alloc->vma_vm_mm)
 		mmdrop(alloc->vma_vm_mm);
-
-	binder_alloc_debug(BINDER_DEBUG_OPEN_CLOSE,
-		     "%s: %d buffers %d, pages %d\n",
-		     __func__, alloc->pid, buffers, page_count);
 }
 
 static void print_binder_buffer(struct seq_file *m, const char *prefix,
@@ -908,21 +851,13 @@ enum lru_status binder_alloc_free_page(struct list_head *item,
 	spin_unlock(lock);
 
 	if (vma) {
-		trace_binder_unmap_user_start(alloc, index);
-
 		zap_page_range(vma, page_addr, PAGE_SIZE, NULL);
-
-		trace_binder_unmap_user_end(alloc, index);
 	}
 	up_write(&mm->mmap_sem);
 	mmput(mm);
 
-	trace_binder_unmap_kernel_start(alloc, index);
-
 	__free_page(page->page_ptr);
 	page->page_ptr = NULL;
-
-	trace_binder_unmap_kernel_end(alloc, index);
 
 	spin_lock(lock);
 	mutex_unlock(&alloc->mutex);

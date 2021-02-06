@@ -1088,76 +1088,66 @@ struct ext4_inode_info {
 /*
  * File system states
  */
-#define	EXT4_VALID_FS			0x0001	/* Unmounted cleanly */
-#define	EXT4_ERROR_FS			0x0002	/* Errors detected */
-#define	EXT4_ORPHAN_FS			0x0004	/* Orphans being recovered */
+#define	EXT4_VALID_FS			0x0001
+#define	EXT4_ERROR_FS			0x0002
+#define	EXT4_ORPHAN_FS			0x0004
 
 /*
  * Misc. filesystem flags
  */
-#define EXT2_FLAGS_SIGNED_HASH		0x0001  /* Signed dirhash in use */
-#define EXT2_FLAGS_UNSIGNED_HASH	0x0002  /* Unsigned dirhash in use */
-#define EXT2_FLAGS_TEST_FILESYS		0x0004	/* to test development code */
+#define EXT2_FLAGS_SIGNED_HASH		0x0001
+#define EXT2_FLAGS_UNSIGNED_HASH	0x0002
+#define EXT2_FLAGS_TEST_FILESYS		0x0004
 
 /*
  * Mount flags set via mount options or defaults
  */
-#define EXT4_MOUNT_GRPID		0x00004	/* Create files with directory's group */
-#define EXT4_MOUNT_DEBUG		0x00008	/* Some debugging messages */
-#define EXT4_MOUNT_ERRORS_CONT		0x00010	/* Continue on errors */
-#define EXT4_MOUNT_ERRORS_RO		0x00020	/* Remount fs ro on errors */
-#define EXT4_MOUNT_ERRORS_PANIC		0x00040	/* Panic on errors */
+#define EXT4_MOUNT_GRPID		0x00004
+#define EXT4_MOUNT_DEBUG		0x00008
+#define EXT4_MOUNT_ERRORS_CONT		0x00010
+#define EXT4_MOUNT_ERRORS_RO		0x00020
+#define EXT4_MOUNT_ERRORS_PANIC		0x00040
 #define EXT4_MOUNT_ERRORS_MASK		0x00070
-#define EXT4_MOUNT_MINIX_DF		0x00080	/* Mimics the Minix statfs */
-#define EXT4_MOUNT_NOLOAD		0x00100	/* Don't use existing journal*/
+#define EXT4_MOUNT_MINIX_DF		0x00080
+#define EXT4_MOUNT_NOLOAD		0x00100
 #ifdef CONFIG_FS_DAX
-#define EXT4_MOUNT_DAX			0x00200	/* Direct Access */
+#define EXT4_MOUNT_DAX			0x00200
 #else
 #define EXT4_MOUNT_DAX			0
 #endif
-#define EXT4_MOUNT_DATA_FLAGS		0x00C00	/* Mode for data writes: */
-#define EXT4_MOUNT_JOURNAL_DATA		0x00400	/* Write data to journal */
-#define EXT4_MOUNT_ORDERED_DATA		0x00800	/* Flush data before commit */
-#define EXT4_MOUNT_WRITEBACK_DATA	0x00C00	/* No data ordering */
-#define EXT4_MOUNT_UPDATE_JOURNAL	0x01000	/* Update the journal format */
-#define EXT4_MOUNT_NO_UID32		0x02000  /* Disable 32-bit UIDs */
-#define EXT4_MOUNT_XATTR_USER		0x04000	/* Extended user attributes */
-#define EXT4_MOUNT_POSIX_ACL		0x08000	/* POSIX Access Control Lists */
-#define EXT4_MOUNT_NO_AUTO_DA_ALLOC	0x10000	/* No auto delalloc mapping */
-#define EXT4_MOUNT_BARRIER		0x20000 /* Use block barriers */
-#define EXT4_MOUNT_QUOTA		0x40000 /* Some quota option set */
-#define EXT4_MOUNT_USRQUOTA		0x80000 /* "old" user quota,
-						 * enable enforcement for hidden
-						 * quota files */
-#define EXT4_MOUNT_GRPQUOTA		0x100000 /* "old" group quota, enable
-						  * enforcement for hidden quota
-						  * files */
-#define EXT4_MOUNT_PRJQUOTA		0x200000 /* Enable project quota
-						  * enforcement */
-#define EXT4_MOUNT_DIOREAD_NOLOCK	0x400000 /* Enable support for dio read nolocking */
-#define EXT4_MOUNT_JOURNAL_CHECKSUM	0x800000 /* Journal checksums */
-#define EXT4_MOUNT_JOURNAL_ASYNC_COMMIT	0x1000000 /* Journal Async Commit */
-#define EXT4_MOUNT_DELALLOC		0x8000000 /* Delalloc support */
-#define EXT4_MOUNT_DATA_ERR_ABORT	0x10000000 /* Abort on file data write */
-#define EXT4_MOUNT_BLOCK_VALIDITY	0x20000000 /* Block validity checking */
-#define EXT4_MOUNT_DISCARD		0x40000000 /* Issue DISCARD requests */
-#define EXT4_MOUNT_INIT_INODE_TABLE	0x80000000 /* Initialize uninitialized itables */
+#define EXT4_MOUNT_DATA_FLAGS		0x00C00
+#define EXT4_MOUNT_JOURNAL_DATA		0x00400
+#define EXT4_MOUNT_ORDERED_DATA		0x00800
+#define EXT4_MOUNT_WRITEBACK_DATA	0x00C00
+#define EXT4_MOUNT_UPDATE_JOURNAL	0x01000
+#define EXT4_MOUNT_NO_UID32		0x02000
+#define EXT4_MOUNT_XATTR_USER		0x04000
+#define EXT4_MOUNT_POSIX_ACL		0x08000
+#define EXT4_MOUNT_NO_AUTO_DA_ALLOC	0x10000
+#define EXT4_MOUNT_BARRIER		0x20000
+#define EXT4_MOUNT_QUOTA		0x40000
+#define EXT4_MOUNT_USRQUOTA		0x80000
+#define EXT4_MOUNT_GRPQUOTA		0x100000 
+#define EXT4_MOUNT_PRJQUOTA		0x200000
+#define EXT4_MOUNT_DIOREAD_NOLOCK	0x400000
+#define EXT4_MOUNT_JOURNAL_CHECKSUM	0x800000
+#define EXT4_MOUNT_JOURNAL_ASYNC_COMMIT	0x1000000
+#define EXT4_MOUNT_ASYNC_FSYNC 		0x2000000
+#define EXT4_MOUNT_DELALLOC		0x8000000
+#define EXT4_MOUNT_DATA_ERR_ABORT	0x10000000
+#define EXT4_MOUNT_BLOCK_VALIDITY	0x20000000
+#define EXT4_MOUNT_DISCARD		0x40000000
+#define EXT4_MOUNT_INIT_INODE_TABLE	0x80000000
 
 /*
  * Mount flags set either automatically (could not be set by mount option)
  * based on per file system feature or property or in special cases such as
  * distinguishing between explicit mount option definition and default.
  */
-#define EXT4_MOUNT2_EXPLICIT_DELALLOC	0x00000001 /* User explicitly
-						      specified delalloc */
-#define EXT4_MOUNT2_STD_GROUP_SIZE	0x00000002 /* We have standard group
-						      size of blocksize * 8
-						      blocks */
-#define EXT4_MOUNT2_HURD_COMPAT		0x00000004 /* Support HURD-castrated
-						      file systems */
-
-#define EXT4_MOUNT2_EXPLICIT_JOURNAL_CHECKSUM	0x00000008 /* User explicitly
-						specified journal checksum */
+#define EXT4_MOUNT2_EXPLICIT_DELALLOC	0x00000001
+#define EXT4_MOUNT2_STD_GROUP_SIZE	0x00000002
+#define EXT4_MOUNT2_HURD_COMPAT		0x00000004 
+#define EXT4_MOUNT2_EXPLICIT_JOURNAL_CHECKSUM	0x00000008
 
 #define clear_opt(sb, opt)		EXT4_SB(sb)->s_mount_opt &= \
 						~EXT4_MOUNT_##opt
@@ -1188,15 +1178,15 @@ extern void ext4_set_bits(void *bm, int cur, int len);
 /*
  * Maximal mount counts between two filesystem checks
  */
-#define EXT4_DFL_MAX_MNT_COUNT		20	/* Allow 20 mounts */
-#define EXT4_DFL_CHECKINTERVAL		0	/* Don't use interval check */
+#define EXT4_DFL_MAX_MNT_COUNT		20
+#define EXT4_DFL_CHECKINTERVAL		0
 
 /*
  * Behaviour when detecting errors
  */
-#define EXT4_ERRORS_CONTINUE		1	/* Continue execution */
-#define EXT4_ERRORS_RO			2	/* Remount fs read-only */
-#define EXT4_ERRORS_PANIC		3	/* Panic */
+#define EXT4_ERRORS_CONTINUE		1
+#define EXT4_ERRORS_RO			2
+#define EXT4_ERRORS_PANIC		3
 #define EXT4_ERRORS_DEFAULT		EXT4_ERRORS_CONTINUE
 
 /* Metadata checksum algorithm codes */
@@ -1339,14 +1329,8 @@ struct ext4_super_block {
 #ifdef CONFIG_FS_ENCRYPTION
 #define DUMMY_ENCRYPTION_ENABLED(sbi) (unlikely((sbi)->s_mount_flags & \
 						EXT4_MF_TEST_DUMMY_ENCRYPTION))
-#ifdef CONFIG_EXT4_ANDROID_FS_ENCRYPTION
-#define ANDROID_ENCRYPTION_ENABLED(sbi) (1)
-#else
-#define ANDROID_ENCRYPTION_ENABLED(sbi) (0)
-#endif
 #else
 #define DUMMY_ENCRYPTION_ENABLED(sbi) (0)
-#define ANDROID_ENCRYPTION_ENABLED(sbi) (0)
 #endif
 
 /* Number of quota types we support */
@@ -1499,6 +1483,12 @@ struct ext4_sb_info {
 
 	/* record the last minlen when FITRIM is called. */
 	atomic_t s_last_trim_minblks;
+
+	/* # of issued fsync/fdatasync */
+	atomic_t s_total_fsync;
+
+	/* # of issued fsync/fdatasync need transaction to complete */
+	atomic_t s_async_fsync;
 
 	/* Reference to checksum algorithm driver via cryptoapi */
 	struct crypto_shash *s_chksum_driver;

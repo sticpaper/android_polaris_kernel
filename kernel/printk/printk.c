@@ -45,7 +45,6 @@
 #include <linux/utsname.h>
 #include <linux/ctype.h>
 #include <linux/uio.h>
-#include <soc/qcom/boot_stats.h>
 
 #include <asm/uaccess.h>
 #include <asm/sections.h>
@@ -581,7 +580,7 @@ static int log_store(int facility, int level,
 	if (ts_nsec > 0)
 		msg->ts_nsec = ts_nsec;
 	else
-		msg->ts_nsec = local_clock();
+		msg->ts_nsec = local_clock() + get_total_sleep_time_nsec();
 	memset(log_dict(msg) + dict_len, 0, pad_len);
 	msg->len = size;
 
@@ -713,65 +712,7 @@ struct devkmsg_user {
 
 static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 {
-	char *buf, *line;
-	int level = default_message_loglevel;
-	int facility = 1;	/* LOG_USER */
-	struct file *file = iocb->ki_filp;
-	struct devkmsg_user *user = file->private_data;
-	size_t len = iov_iter_count(from);
-	ssize_t ret = len;
-
-	if (!user || len > LOG_LINE_MAX)
-		return -EINVAL;
-
-	/* Ignore when user logging is disabled. */
-	if (devkmsg_log & DEVKMSG_LOG_MASK_OFF)
-		return len;
-
-	/* Ratelimit when not explicitly enabled. */
-	if (!(devkmsg_log & DEVKMSG_LOG_MASK_ON)) {
-		if (!___ratelimit(&user->rs, current->comm))
-			return ret;
-	}
-
-	buf = kmalloc(len+1, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[len] = '\0';
-	if (copy_from_iter(buf, len, from) != len) {
-		kfree(buf);
-		return -EFAULT;
-	}
-
-	/*
-	 * Extract and skip the syslog prefix <[0-9]*>. Coming from userspace
-	 * the decimal value represents 32bit, the lower 3 bit are the log
-	 * level, the rest are the log facility.
-	 *
-	 * If no prefix or no userspace facility is specified, we
-	 * enforce LOG_USER, to be able to reliably distinguish
-	 * kernel-generated messages from userspace-injected ones.
-	 */
-	line = buf;
-	if (line[0] == '<') {
-		char *endp = NULL;
-		unsigned int u;
-
-		u = simple_strtoul(line + 1, &endp, 10);
-		if (endp && endp[0] == '>') {
-			level = LOG_LEVEL(u);
-			if (LOG_FACILITY(u) != 0)
-				facility = LOG_FACILITY(u);
-			endp++;
-			len -= endp - line;
-			line = endp;
-		}
-	}
-
-	printk_emit(facility, level, NULL, 0, "%s", line);
-	kfree(buf);
-	return ret;
+	return iov_iter_count(from);
 }
 
 static ssize_t devkmsg_read(struct file *file, char __user *buf,
@@ -1178,6 +1119,7 @@ static size_t print_time(u64 ts, char *buf)
 	if (!printk_time)
 		return 0;
 
+	ts += get_total_sleep_time_nsec();
 	rem_nsec = do_div(ts, 1000000000);
 
 	if (!buf)
@@ -1532,8 +1474,6 @@ static void call_console_drivers(int level,
 {
 	struct console *con;
 
-	trace_console_rcuidle(text, len);
-
 	if (!console_drivers)
 		return;
 
@@ -1653,7 +1593,7 @@ static bool cont_add(int facility, int level, enum log_flags flags, const char *
 		cont.facility = facility;
 		cont.level = level;
 		cont.owner = current;
-		cont.ts_nsec = local_clock();
+		cont.ts_nsec = local_clock() + get_total_sleep_time_nsec();
 		cont.flags = flags;
 		cont.cons = 0;
 		cont.flushed = false;
@@ -2096,7 +2036,7 @@ int add_preferred_console(char *name, int idx, char *options)
 	return __add_preferred_console(name, idx, options, NULL);
 }
 
-bool console_suspend_enabled = true;
+bool console_suspend_enabled = false;
 EXPORT_SYMBOL(console_suspend_enabled);
 
 static int __init console_suspend_disable(char *str)
@@ -2129,7 +2069,6 @@ void resume_console(void)
 {
 	if (!console_suspend_enabled)
 		return;
-	place_marker("M - System Resume Started");
 	down_console_sem();
 	console_suspended = 0;
 	console_unlock();
@@ -2139,27 +2078,20 @@ void resume_console(void)
 
 /**
  * console_cpu_notify - print deferred console messages after CPU hotplug
- * @self: notifier struct
- * @action: CPU hotplug event
- * @hcpu: unused
+ * @cpu: unused
  *
  * If printk() is called from a CPU that is not online yet, the messages
  * will be spooled but will not show up on the console.  This function is
  * called when a new CPU comes online (or fails to come up), and ensures
  * that any such output gets printed.
  */
-static int console_cpu_notify(struct notifier_block *self,
-	unsigned long action, void *hcpu)
+static int console_cpu_notify(unsigned int cpu)
 {
-	switch (action) {
-	case CPU_ONLINE:
-	case CPU_DEAD:
-	case CPU_DOWN_FAILED:
-	case CPU_UP_CANCELED:
+	if (!cpuhp_tasks_frozen) {
 		console_lock();
 		console_unlock();
 	}
-	return NOTIFY_OK;
+	return 0;
 }
 
 #endif
@@ -2798,6 +2730,7 @@ EXPORT_SYMBOL(unregister_console);
 static int __init printk_late_init(void)
 {
 	struct console *con;
+	int __maybe_unused ret;
 
 	for_each_console(con) {
 		if (!keep_bootcon && con->flags & CON_BOOT) {
@@ -2813,7 +2746,12 @@ static int __init printk_late_init(void)
 		}
 	}
 #ifdef CONFIG_CONSOLE_FLUSH_ON_HOTPLUG
-	hotcpu_notifier(console_cpu_notify, 0);
+	ret = cpuhp_setup_state_nocalls(CPUHP_PRINTK_DEAD, "printk:dead", NULL,
+					console_cpu_notify);
+	WARN_ON(ret < 0);
+	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN, "printk:online",
+					console_cpu_notify, NULL);
+	WARN_ON(ret < 0);
 #endif
 	return 0;
 }

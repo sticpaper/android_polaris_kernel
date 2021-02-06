@@ -1148,10 +1148,12 @@ struct ipa3_active_clients {
 	int bus_vote_idx;
 };
 
+#if 0
 struct ipa3_wakelock_ref_cnt {
 	spinlock_t spinlock;
 	int cnt;
 };
+#endif
 
 struct ipa3_tag_completion {
 	struct completion comp;
@@ -1600,8 +1602,10 @@ struct ipa3_context {
 	bool gsi_ch20_wa;
 	bool s1_bypass_arr[IPA_SMMU_CB_MAX];
 	u32 wdi_map_cnt;
+#if 0
 	struct wakeup_source w_lock;
 	struct ipa3_wakelock_ref_cnt wakelock_ref_cnt;
+#endif
 	/* RMNET_IOCTL_INGRESS_FORMAT_AGG_DATA */
 	bool ipa_client_apps_wan_cons_agg_gro;
 	/* M-release support to know client pipes */
@@ -2379,8 +2383,21 @@ int __ipa3_del_rt_rule(u32 rule_hdl);
 int __ipa3_del_hdr(u32 hdr_hdl, bool by_user);
 int __ipa3_release_hdr(u32 hdr_hdl);
 int __ipa3_release_hdr_proc_ctx(u32 proc_ctx_hdl);
+#ifdef CONFIG_DEBUG_FS
 int _ipa_read_ep_reg_v3_0(char *buf, int max_len, int pipe);
 int _ipa_read_ep_reg_v4_0(char *buf, int max_len, int pipe);
+#else
+static inline
+int _ipa_read_ep_reg_v3_0(char *buf, int max_len, int pipe)
+{
+	return 0;
+}
+static inline
+int _ipa_read_ep_reg_v4_0(char *buf, int max_len, int pipe)
+{
+	return 0;
+}
+#endif
 int _ipa_read_ipahal_regs(void);
 void _ipa_enable_clks_v3_0(void);
 void _ipa_disable_clks_v3_0(void);
