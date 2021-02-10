@@ -150,28 +150,6 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 	}
 }
 
-/**
- * get_next_freq - Compute a new frequency for a given cpufreq policy.
- * @sg_policy: schedutil policy object to compute the new frequency for.
- * @util: Current CPU utilization.
- * @max: CPU capacity.
- *
- * If the utilization is frequency-invariant, choose the new frequency to be
- * proportional to it, that is
- *
- * next_freq = C * max_freq * util / max
- *
- * Otherwise, approximate the would-be frequency-invariant utilization by
- * util_raw * (curr_freq / max_freq) which leads to
- *
- * next_freq = C * curr_freq * util_raw / max
- *
- * Take C = 1.25 for the frequency tipping point at (util / max) = 0.8.
- *
- * The lowest driver-supported frequency which is equal or greater than the raw
- * next_freq (as calculated above) is returned, subject to policy min/max and
- * cpufreq driver limitations.
- */
 static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 				  unsigned long util, unsigned long max)
 {
@@ -310,10 +288,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 		sg_cpu->flags = flags;
 		sugov_iowait_boost(sg_cpu, &util, &max);
 		next_f = get_next_freq(sg_policy, util, max);
-		/*
-		 * Do not reduce the frequency if the CPU has not been idle
-		 * recently, as the reduction is likely to be premature then.
-		 */
+
 		if (busy && next_f < sg_policy->next_freq) {
 			next_f = sg_policy->next_freq;
 			/* clear cache when it's bypassed */
@@ -336,13 +311,6 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 		unsigned long j_util, j_max;
 		s64 delta_ns;
 
-		/*
-		 * If the CPU utilization was last updated before the previous
-		 * frequency update and the time elapsed between the last update
-		 * of the CPU utilization and the last frequency update is long
-		 * enough, don't take the CPU into account as it probably is
-		 * idle now (and clear iowait_boost for it).
-		 */
 		delta_ns = time - j_sg_cpu->last_update;
 		if (delta_ns > stale_ns) {
 			j_sg_cpu->iowait_boost = 0;
@@ -425,19 +393,6 @@ static void sugov_irq_work(struct irq_work *irq_work)
 
 	sg_policy = container_of(irq_work, struct sugov_policy, irq_work);
 
-	/*
-	 * For RT and deadline tasks, the schedutil governor shoots the
-	 * frequency to maximum. Special care must be taken to ensure that this
-	 * kthread doesn't result in the same behavior.
-	 *
-	 * This is (mostly) guaranteed by the work_in_progress flag. The flag is
-	 * updated only at the end of the sugov_work() function and before that
-	 * the schedutil governor rejects all other frequency scaling requests.
-	 *
-	 * There is a very rare case though, where the RT thread yields right
-	 * after the work_in_progress flag is cleared. The effects of that are
-	 * neglected for now.
-	 */
 	kthread_queue_work(&sg_policy->worker, &sg_policy->work);
 }
 
@@ -687,7 +642,6 @@ static int sugov_init(struct cpufreq_policy *policy)
 	struct sugov_tunables *tunables;
 	int ret = 0;
 
-	/* State should be equivalent to EXIT */
 	if (policy->governor_data)
 		return -EBUSY;
 
@@ -723,11 +677,6 @@ static int sugov_init(struct cpufreq_policy *policy)
 		goto stop_kthread;
 	}
 
-	/*
-	 * NOTE:
-	 * intializing up_rate/down_rate to 0 explicitly in kernel
-	 * since WALT expects so by default.
-	 */
 	tunables->up_rate_limit_us = 0;
 	tunables->down_rate_limit_us = 0;
 	tunables->iowait_boost_enable = true;
