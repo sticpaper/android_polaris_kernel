@@ -23,6 +23,7 @@
 #define cpufreq_enable_fast_switch(x)
 #define cpufreq_disable_fast_switch(x)
 #define LATENCY_MULTIPLIER			(1000)
+#define CPU_RATE_LIMIT_US			(1000)
 #define SUGOV_KTHREAD_PRIORITY	50
 
 struct sugov_tunables {
@@ -648,8 +649,8 @@ static int sugov_init(struct cpufreq_policy *policy)
 		goto stop_kthread;
 	}
 
-	tunables->up_rate_limit_us = 0;
-	tunables->down_rate_limit_us = 0;
+	tunables->up_rate_limit_us = CPU_RATE_LIMIT_US;
+	tunables->down_rate_limit_us = CPU_RATE_LIMIT_US;
 	lat = policy->cpuinfo.transition_latency / NSEC_PER_USEC;
 	if (lat) {
 		tunables->up_rate_limit_us *= lat;
