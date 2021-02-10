@@ -693,7 +693,7 @@ static struct kobj_type sugov_tunables_ktype = {
 
 /********************** cpufreq governor interface *********************/
 
-static struct cpufreq_governor schedutil_gov;
+static struct cpufreq_governor paperutil_gov;
 
 static struct sugov_policy *sugov_policy_alloc(struct cpufreq_policy *policy)
 {
@@ -885,7 +885,7 @@ static int sugov_init(struct cpufreq_policy *policy)
 
 	ret = kobject_init_and_add(&tunables->attr_set.kobj, &sugov_tunables_ktype,
 				   get_governor_parent_kobj(policy), "%s",
-				   schedutil_gov.name);
+				   paperutil_gov.name);
 	if (ret)
 		goto fail;
 
@@ -1005,8 +1005,8 @@ static void sugov_limits(struct cpufreq_policy *policy)
 	sg_policy->need_freq_update = true;
 }
 
-static struct cpufreq_governor schedutil_gov = {
-	.name = "schedutil",
+static struct cpufreq_governor paperutil_gov = {
+	.name = "paperutil",
 	.owner = THIS_MODULE,
 	.init = sugov_init,
 	.exit = sugov_exit,
@@ -1015,15 +1015,15 @@ static struct cpufreq_governor schedutil_gov = {
 	.limits = sugov_limits,
 };
 
-#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL
+#ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_PAPERUTIL
 struct cpufreq_governor *cpufreq_default_governor(void)
 {
-	return &schedutil_gov;
+	return &paperutil_gov;
 }
 #endif
 
 static int __init sugov_register(void)
 {
-	return cpufreq_register_governor(&schedutil_gov);
+	return cpufreq_register_governor(&paperutil_gov);
 }
 fs_initcall(sugov_register);
